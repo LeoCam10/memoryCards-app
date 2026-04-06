@@ -109,111 +109,82 @@ export default function RegistroPage() {
   };
 
   return (
-    <main style={{ padding: "40px", color: "white" }}>
-      <h1>Registro de Usuario</h1>
-
-      <div
-        style={{
-          border: "1px solid white",
-          padding: "20px",
-          width: "380px",
-          marginTop: "20px",
-        }}
-      >
-        <label>Nombre de usuario</label>
-        <input
-          value={nombreUsuario}
-          onChange={(e) => setNombreUsuario(e.target.value)}
-          style={inputStyle}
-        />
-
-        <label>Contraseña</label>
-        <input
-          type="password"
-          value={contrasena}
-          onChange={(e) => setContrasena(e.target.value)}
-          style={inputStyle}
-        />
-
-        <div style={{ position: "relative", marginBottom: "12px" }}>
-          <label>País</label>
-          <input
-            value={paisTexto}
-            onChange={(e) => manejarCambioPais(e.target.value)}
-            style={inputStyle}
-          />
-
-          {sugerencias.length > 0 && (
-            <div style={dropdownStyle}>
-              {sugerencias.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => seleccionarPais(p)}
-                  style={itemStyle}
-                >
-                  {p.nombre}
-                </div>
-              ))}
+    <main className="page">
+      <div className="container">
+        <div className="registro-wrapper">
+          <div className="form-card-wide registro-card">
+            <div className="registro-header">
+              <h1 className="login-right-title">Registro de Usuario</h1>
+              <p className="login-right-text">
+                Completá los datos para crear un nuevo usuario.
+              </p>
             </div>
-          )}
-        </div>
 
-        <label
-          style={{
-            display: "flex",
-            gap: "8px",
-            marginBottom: "12px",
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={mayor12}
-            onChange={(e) => setMayor12(e.target.checked)}
-          />
-          Soy mayor de 12 años
-        </label>
+            <label className="form-label">Nombre de usuario</label>
+            <input
+              value={nombreUsuario}
+              onChange={(e) => setNombreUsuario(e.target.value)}
+              className="form-input"
+            />
 
-        {error && <p style={{ color: "tomato" }}>{error}</p>}
-        {mensaje && <p style={{ color: "lightgreen" }}>{mensaje}</p>}
+            <label className="form-label">Contraseña</label>
+            <input
+              type="password"
+              value={contrasena}
+              onChange={(e) => setContrasena(e.target.value)}
+              className="form-input"
+            />
 
-        <div style={{ marginTop: "20px" }}>
-          <button onClick={registrarUsuario} style={{ marginRight: "10px" }}>
-            Registrarse
-          </button>
+            <div className="registro-pais-wrap">
+              <label className="form-label">País</label>
+              <input
+                value={paisTexto}
+                onChange={(e) => manejarCambioPais(e.target.value)}
+                className="form-input"
+              />
 
-          <button onClick={() => router.push("/")}>Volver al login</button>
+              {sugerencias.length > 0 && (
+                <div className="dropdown">
+                  {sugerencias.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => seleccionarPais(p)}
+                      className="dropdown-item"
+                    >
+                      {p.nombre}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <label className="checkbox-row registro-checkbox">
+              <input
+                type="checkbox"
+                checked={mayor12}
+                onChange={(e) => setMayor12(e.target.checked)}
+              />
+              <span>Soy mayor de 12 años</span>
+            </label>
+
+            {error && <p className="alert-error">{error}</p>}
+            {mensaje && <p className="alert-success">{mensaje}</p>}
+
+            <div className="login-bottom-actions registro-actions">
+              <button onClick={registrarUsuario} className="btn btn-primary">
+                Registrarse
+              </button>
+
+              <button
+                onClick={() => router.push("/")}
+                className="btn btn-secondary"
+              >
+                Volver al login
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </main>
   );
 }
-
-const inputStyle = {
-  display: "block",
-  width: "100%",
-  marginBottom: "12px",
-  backgroundColor: "white",
-  color: "black",
-  border: "1px solid gray",
-  padding: "6px",
-};
-
-const dropdownStyle = {
-  position: "absolute" as const,
-  top: "100%",
-  left: 0,
-  width: "100%",
-  backgroundColor: "white",
-  color: "black",
-  border: "1px solid gray",
-  zIndex: 10,
-  maxHeight: "150px",
-  overflowY: "auto" as const,
-};
-
-const itemStyle = {
-  padding: "8px",
-  cursor: "pointer",
-  borderBottom: "1px solid #ddd",
-};

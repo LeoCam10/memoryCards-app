@@ -791,3 +791,36 @@ select {
   gap: 24px; /* separación entre botones */
   margin-top: 24px;
 }
+.registro-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.registro-card {
+  width: 520px;
+  max-width: 100%;
+}
+
+.registro-header {
+  margin-bottom: 18px;
+}
+
+.registro-pais-wrap {
+  position: relative;
+}
+
+.registro-checkbox {
+  margin-top: 6px;
+  color: var(--text);
+}
+
+.registro-actions {
+  margin-top: 18px;
+}
+
+@media (max-width: 768px) {
+  .registro-card {
+    width: 100%;
+  }
+}
