@@ -541,11 +541,11 @@ export default function ConfiguracionPage() {
             {sorteando ? "Sorteando..." : "Lanzar dados"}
           </button>
 
-          <p className="summary-text">{mensajeSorteo}</p>
+
 
           {sorteoRealizado && turnoInicial && (
             <p className="start-text">
-              <strong>Empieza:</strong>{" "}
+              <strong>Jugador que configura e inicia la partida :</strong>{" "}
               {turnoInicial === "Jugador 1"
                 ? jugador1?.nombre_usuario ?? "Jugador 1"
                 : jugador2?.nombre_usuario ?? "Jugador 2"}
