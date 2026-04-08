@@ -51,6 +51,18 @@ export default function ResultadoPage() {
     ).padStart(2, "0")}`;
   };
 
+  const valorGanadorJugador1 =
+    resultado?.ganador === resultado?.jugador1Nombre ? "✅" : "-";
+
+  const valorGanadorJugador2 =
+    resultado?.ganador === resultado?.jugador2Nombre ? "✅" : "-";
+
+  const valorComenzoJugador1 =
+    resultado?.ganadorSorteo === "Jugador 1" ? "Sí" : "-";
+
+  const valorComenzoJugador2 =
+    resultado?.ganadorSorteo === "Jugador 2" ? "Sí" : "-";
+
   if (!resultado) {
     return (
       <main className="page">
@@ -64,56 +76,60 @@ export default function ResultadoPage() {
   return (
     <main className="page">
       <div className="container">
-        <h1 className="page-title">Resultado final</h1>
+
 
         <div className="panel result-panel-compact">
+          <h2 className="match-title">Resultado de la partida</h2>
+
           <p>
             <strong>Partida:</strong>{" "}
             <span className="highlight">#{resultado.numeroPartida}</span>
           </p>
 
-          <p>
-            <strong>Ganador:</strong> {resultado.ganador}
-          </p>
+          <div className="match-table">
+            <div>{resultado.jugador1Nombre}</div>
+            <div>Jugador</div>
+            <div>{resultado.jugador2Nombre}</div>
 
-          <p>
-            <strong>Mensaje:</strong> {resultado.mensaje}
-          </p>
+            <div>{valorGanadorJugador1}</div>
+            <div>Ganador</div>
+            <div>{valorGanadorJugador2}</div>
 
-          <p>
-            <strong>Aciertos {resultado.jugador1Nombre}:</strong>{" "}
-            {resultado.aciertosJugador1}
-          </p>
+            <div>{resultado.aciertosJugador1}</div>
+            <div>Aciertos</div>
+            <div>{resultado.aciertosJugador2}</div>
 
-          <p>
-            <strong>Aciertos {resultado.jugador2Nombre}:</strong>{" "}
-            {resultado.aciertosJugador2}
-          </p>
+            <div>{resultado.intentosJugador1}</div>
+            <div>Intentos</div>
+            <div>{resultado.intentosJugador2}</div>
 
-          <p>
-            <strong>Intentos {resultado.jugador1Nombre}:</strong>{" "}
-            {resultado.intentosJugador1}
-          </p>
+            <div>{resultado.puntosFinalesJugador1}</div>
+            <div>Puntos</div>
+            <div>{resultado.puntosFinalesJugador2}</div>
 
-          <p>
-            <strong>Intentos {resultado.jugador2Nombre}:</strong>{" "}
-            {resultado.intentosJugador2}
-          </p>
+            <div>{resultado.dadoJugador1 ?? "-"}</div>
+            <div>Dado del sorteo</div>
+            <div>{resultado.dadoJugador2 ?? "-"}</div>
 
-          <p>
-            <strong>Puntos {resultado.jugador1Nombre}:</strong>{" "}
-            {resultado.puntosFinalesJugador1}
-          </p>
+            <div>{valorComenzoJugador1}</div>
+            <div>Comenzó</div>
+            <div>{valorComenzoJugador2}</div>
+          </div>
 
-          <p>
-            <strong>Puntos {resultado.jugador2Nombre}:</strong>{" "}
-            {resultado.puntosFinalesJugador2}
-          </p>
+          <div className="match-extra">
+            <p>
+              <strong>Mensaje:</strong> {resultado.mensaje}
+            </p>
 
-          <p>
-            <strong>Tiempo jugado:</strong>{" "}
-            {formatearTiempo(resultado.tiempoJugado)}
-          </p>
+            <p>
+              <strong>Tiempo jugado:</strong>{" "}
+              {formatearTiempo(resultado.tiempoJugado)}
+            </p>
+
+
+
+
+          </div>
 
           <div className="result-actions">
             <button
@@ -127,7 +143,7 @@ export default function ResultadoPage() {
               onClick={volverAInicio}
               className="btn btn-secondary"
             >
-                Volver a inicio
+              Volver a inicio
             </button>
           </div>
         </div>
