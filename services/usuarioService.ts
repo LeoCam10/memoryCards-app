@@ -14,7 +14,7 @@ export async function registrarUsuario({
   email,
   password,
   nombreUsuario,
-  pais,
+  paisId,
   mayor12,
 }: RegistrarUsuarioParams) {
   const { data, error } = await supabase.auth.signUp({
@@ -25,6 +25,7 @@ export async function registrarUsuario({
   if (error) throw error;
 
   const userId = data.user?.id;
+
   if (!userId) {
     throw new Error("No se pudo obtener el id del usuario autenticado.");
   }
@@ -34,7 +35,7 @@ export async function registrarUsuario({
       id: userId,
       email,
       nombre_usuario: nombreUsuario,
-      pais_id: pais,
+      pais_id: paisId,
       mayor_12: mayor12,
     },
   ]);

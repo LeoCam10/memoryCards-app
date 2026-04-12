@@ -18,6 +18,6 @@ export type RegistrarUsuarioParams = {
   email: string;
   password: string;
   nombreUsuario: string;
-  pais: string;
+  paisId: string;
   mayor12: boolean;
 };
