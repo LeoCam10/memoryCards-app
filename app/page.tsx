@@ -2,51 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pais } from "@/types/pais";
 import {
-  registrarUsuario,
-  loginUsuario,
-  obtenerPerfilUsuario,
-  cerrarSesionUsuario,
-  obtenerPaises,
-  type Pais,
-} from "@/services/authService";
+  JugadorPerfil,
+  EstadoLogin,
+
+} from "@/types/usuario";
+
+import {
+  PartidaUsuario,
+  PartidaEnComun,
+} from "@/types/partida";
 import {
   obtenerPartidasUsuario,
   obtenerPartidasEnComun,
 } from "@/services/partidaService";
-
-type JugadorPerfil = {
-  id: string;
-  email: string;
-  nombre_usuario: string;
-  pais: string;
-  mayor_12: boolean;
-};
-
-type EstadoLogin = {
-  email: string;
-  password: string;
-  cargando: boolean;
-  error: string;
-  jugador: JugadorPerfil | null;
-};
-
-type PartidaUsuario = {
-  partida_id: string;
-  fecha: string;
-  puntos_obtenidos: number;
-  rival_id: string;
-  rival_nombre: string;
-};
-
-type PartidaEnComun = {
-  partida_id: string;
-  fecha: string;
-  jugador1_nombre: string;
-  jugador2_nombre: string;
-  puntos_jugador1: number;
-  puntos_jugador2: number;
-};
+import {
+  registrarUsuario,
+  loginCompleto,
+  cerrarSesionUsuario,
+  obtenerPaises,
+} from "@/services/usuarioService";
 
 export default function HomePage() {
   const router = useRouter();
@@ -72,7 +48,8 @@ export default function HomePage() {
   const [registroEmail, setRegistroEmail] = useState("");
   const [registroPassword, setRegistroPassword] = useState("");
   const [registroNombreUsuario, setRegistroNombreUsuario] = useState("");
-  const [registroPais, setRegistroPais] = useState("");
+  const [registroPaisId, setRegistroPaisId] = useState("");
+  const [registroPaisTexto, setRegistroPaisTexto] = useState("");
   const [registroMayor12, setRegistroMayor12] = useState(false);
   const [registroError, setRegistroError] = useState("");
   const [registroMensaje, setRegistroMensaje] = useState("");
@@ -144,7 +121,6 @@ export default function HomePage() {
         const ultimaJ1 = historialJ1[0] as PartidaUsuario | undefined;
         const ultimaJ2 = historialJ2[0] as PartidaUsuario | undefined;
 
-        // 1) Jugaron juntos -> mensaje general
         if (ultimaEnComun) {
           const fecha = new Date(ultimaEnComun.fecha).toLocaleString("es-AR");
 
@@ -156,7 +132,6 @@ export default function HomePage() {
           return;
         }
 
-        // 2) Ninguno jugó nunca -> mensaje general
         if (!ultimaJ1 && !ultimaJ2) {
           setMensajeGeneral("Hola!! Divertite y jugá!!");
           setMensajeJugador1("");
@@ -164,7 +139,6 @@ export default function HomePage() {
           return;
         }
 
-        // 3) Casos individuales
         setMensajeGeneral("");
 
         if (!ultimaJ1) {
@@ -196,14 +170,14 @@ export default function HomePage() {
   }, [jugador1.jugador, jugador2.jugador]);
 
   const paisesFiltrados = useMemo(() => {
-    const texto = registroPais.trim().toLowerCase();
+    const texto = registroPaisTexto.trim().toLowerCase();
 
     if (!texto) return paises.slice(0, 8);
 
     return paises
       .filter((pais) => pais.nombre.toLowerCase().includes(texto))
       .slice(0, 8);
-  }, [registroPais, paises]);
+  }, [registroPaisTexto, paises]);
 
   const iniciarSesion = async (numero: 1 | 2) => {
     const estado = numero === 1 ? jugador1 : jugador2;
@@ -225,8 +199,7 @@ export default function HomePage() {
         return;
       }
 
-      const user = await loginUsuario(estado.email, estado.password);
-      const perfil = await obtenerPerfilUsuario(user.id);
+      const perfil = await loginCompleto(estado.email, estado.password);
 
       const otroJugador = numero === 1 ? jugador2.jugador : jugador1.jugador;
 
@@ -242,7 +215,7 @@ export default function HomePage() {
       setEstado((prev) => ({
         ...prev,
         cargando: false,
-        jugador: perfil,
+        jugador: perfil as JugadorPerfil,
         password: "",
         error: "",
       }));
@@ -283,46 +256,83 @@ export default function HomePage() {
     localStorage.removeItem("jugadoresLogueados");
   };
 
-  const handleRegistrar = async () => {
-    try {
-      setRegistroError("");
-      setRegistroMensaje("");
+ const handleRegistrar = async () => {
+  try {
+    setRegistroError("");
+    setRegistroMensaje("");
 
-      if (
-        !registroEmail ||
-        !registroPassword ||
-        !registroNombreUsuario ||
-        !registroPais
-      ) {
-        setRegistroError("Completá todos los campos.");
-        return;
-      }
-
-      await registrarUsuario({
-        email: registroEmail,
-        password: registroPassword,
-        nombreUsuario: registroNombreUsuario,
-        pais: registroPais,
-        mayor12: registroMayor12,
-      });
-
-      setRegistroMensaje("Usuario registrado correctamente.");
-
-      setRegistroEmail("");
-      setRegistroPassword("");
-      setRegistroNombreUsuario("");
-      setRegistroPais("");
-      setRegistroMayor12(false);
-      setMostrarDropdownPaises(false);
-
-      setTimeout(() => {
-        setMostrarRegistro(false);
-        setRegistroMensaje("");
-      }, 1200);
-    } catch (error: any) {
-      setRegistroError(error.message ?? "Error al registrar.");
+    // Campos obligatorios
+    if (
+      !registroEmail ||
+      !registroPassword ||
+      !registroNombreUsuario ||
+      !registroPaisId
+    ) {
+      setRegistroError("Completá todos los campos.");
+      return;
     }
-  };
+
+    // Mayor de edad
+    if (!registroMayor12) {
+      setRegistroError("Debés confirmar que sos mayor de 12 años.");
+      return;
+    }
+
+    // Email válido
+    if (!registroEmail.includes("@")) {
+      setRegistroError("Ingresá un email válido.");
+      return;
+    }
+
+    // Contraseña mínima
+    if (registroPassword.length < 6) {
+      setRegistroError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    // Usuario mínimo
+    if (registroNombreUsuario.trim().length < 3) {
+      setRegistroError("El nombre de usuario debe tener al menos 3 caracteres.");
+      return;
+    }
+
+    await registrarUsuario({
+      email: registroEmail,
+      password: registroPassword,
+      nombreUsuario: registroNombreUsuario,
+      pais: registroPaisId,
+      mayor12: registroMayor12,
+    });
+
+    setRegistroMensaje("Usuario registrado correctamente.");
+
+    setRegistroEmail("");
+    setRegistroPassword("");
+    setRegistroNombreUsuario("");
+    setRegistroPaisId("");
+    setRegistroPaisTexto("");
+    setRegistroMayor12(false);
+    setMostrarDropdownPaises(false);
+
+    setTimeout(() => {
+      setMostrarRegistro(false);
+      setRegistroMensaje("");
+    }, 1200);
+
+  } catch (error: any) {
+    const mensaje = error.message?.toLowerCase() || "";
+
+    if (mensaje.includes("usuario") || mensaje.includes("username")) {
+      setRegistroError("El nombre de usuario ya está en uso.");
+    } else if (mensaje.includes("email")) {
+      setRegistroError("El email ya está registrado.");
+    } else if (mensaje.includes("duplicate")) {
+      setRegistroError("El usuario o email ya existen.");
+    } else {
+      setRegistroError("Error al registrar. Intentá nuevamente.");
+    }
+  }
+};
 
   const continuar = () => {
     if (!jugador1.jugador || !jugador2.jugador) return;
@@ -596,9 +606,10 @@ export default function HomePage() {
               <label className="form-label">País</label>
               <div className="registro-pais-wrap">
                 <input
-                  value={registroPais}
+                  value={registroPaisTexto}
                   onChange={(e) => {
-                    setRegistroPais(e.target.value);
+                    setRegistroPaisTexto(e.target.value);
+                    setRegistroPaisId("");
                     setMostrarDropdownPaises(true);
                   }}
                   onFocus={() => setMostrarDropdownPaises(true)}
@@ -614,7 +625,8 @@ export default function HomePage() {
                         key={pais.id}
                         className="dropdown-item"
                         onClick={() => {
-                          setRegistroPais(pais.nombre);
+                          setRegistroPaisId(pais.id);
+                          setRegistroPaisTexto(pais.nombre);
                           setMostrarDropdownPaises(false);
                         }}
                       >

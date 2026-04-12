@@ -1,44 +1,22 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
+import {
+  ConfiguracionPartida,
+  PartidaUsuario,
+  RankingItem,
+} from "@/types/partida";
 import { obtenerRanking } from "@/services/rankingService";
 import { obtenerPartidasUsuario } from "@/services/partidaService";
+import { JugadorPerfil } from "@/types/usuario";
 
-
-type Jugador = {
-  id: string;
-  nombre_usuario: string;
-};
-
-type ConfiguracionPartida = {
-  dificultad: string;
-  tiempo: number | null;
-  tipoCartas: string;
-};
-
-type RankingItem = {
-  usuario_id: string;
-  puntos_totales: number;
-  posicion: number;
-  nombre_usuario?: string;
-};
-
-type PartidaUsuario = {
-  partida_id: string;
-  fecha: string;
-  puntos_jugador: number;
-  puntos_rival: number;
-  rival_id: string;
-  rival_nombre: string;
-};
 
 export default function ConfiguracionPage() {
   const router = useRouter();
 
-  const [jugador1, setJugador1] = useState<Jugador | null>(null);
-  const [jugador2, setJugador2] = useState<Jugador | null>(null);
+  const [jugador1, setJugador1] = useState<JugadorPerfil | null>(null);
+  const [jugador2, setJugador2] = useState<JugadorPerfil | null>(null);
 
   const [dificultad, setDificultad] = useState("media");
   const [tiempo, setTiempo] = useState<number | null>(4);
@@ -49,13 +27,16 @@ export default function ConfiguracionPage() {
   const [turnoInicial, setTurnoInicial] = useState<string | null>(null);
   const [sorteando, setSorteando] = useState(false);
   const [sorteoRealizado, setSorteoRealizado] = useState(false);
-  const [mensajeSorteo, setMensajeSorteo] = useState("");
 
   const [rankingTop5, setRankingTop5] = useState<RankingItem[]>([]);
   const [cargandoRankingTop5, setCargandoRankingTop5] = useState(true);
 
-  const [ultimasPartidasJugador1, setUltimasPartidasJugador1] = useState<PartidaUsuario[]>([]);
-  const [ultimasPartidasJugador2, setUltimasPartidasJugador2] = useState<PartidaUsuario[]>([]);
+  const [ultimasPartidasJugador1, setUltimasPartidasJugador1] = useState<
+    PartidaUsuario[]
+  >([]);
+  const [ultimasPartidasJugador2, setUltimasPartidasJugador2] = useState<
+    PartidaUsuario[]
+  >([]);
   const [cargandoUltimasPartidas, setCargandoUltimasPartidas] = useState(true);
 
   useEffect(() => {
@@ -96,7 +77,7 @@ export default function ConfiguracionPage() {
       const data = await obtenerRanking();
 
       if (Array.isArray(data)) {
-        setRankingTop5(data as RankingItem[]);
+        setRankingTop5(data);
       } else {
         setRankingTop5([]);
       }
@@ -108,33 +89,30 @@ export default function ConfiguracionPage() {
     }
   };
 
- const cargarUltimasPartidas = async (j1: Jugador, j2: Jugador) => {
-  try {
-    setCargandoUltimasPartidas(true);
+  const cargarUltimasPartidas = async (j1: JugadorPerfil, j2: JugadorPerfil) => {
+    try {
+      setCargandoUltimasPartidas(true);
 
-    const [partidasJ1, partidasJ2] = await Promise.all([
-      obtenerPartidasUsuario(j1.id, 5),
-      obtenerPartidasUsuario(j2.id, 5),
-    ]);
+      const [partidasJ1, partidasJ2] = await Promise.all([
+        obtenerPartidasUsuario(j1.id, 5),
+        obtenerPartidasUsuario(j2.id, 5),
+      ]);
 
-    setUltimasPartidasJugador1(Array.isArray(partidasJ1) ? partidasJ1 : []);
-    setUltimasPartidasJugador2(Array.isArray(partidasJ2) ? partidasJ2 : []);
-  } catch (error) {
-    console.error("Error al cargar últimas partidas:", error);
-    setUltimasPartidasJugador1([]);
-    setUltimasPartidasJugador2([]);
-  } finally {
-    setCargandoUltimasPartidas(false);
-  }
-};
-
-
+      setUltimasPartidasJugador1(Array.isArray(partidasJ1) ? partidasJ1 : []);
+      setUltimasPartidasJugador2(Array.isArray(partidasJ2) ? partidasJ2 : []);
+    } catch (error) {
+      console.error("Error al cargar últimas partidas:", error);
+      setUltimasPartidasJugador1([]);
+      setUltimasPartidasJugador2([]);
+    } finally {
+      setCargandoUltimasPartidas(false);
+    }
+  };
 
   const lanzarDados = () => {
     if (sorteando) return;
 
     setSorteando(true);
-    setMensajeSorteo("Lanzando dados...");
 
     const intervalo = setInterval(() => {
       setDadoJugador1(Math.floor(Math.random() * 6) + 1);
@@ -154,19 +132,12 @@ export default function ConfiguracionPage() {
       if (valor1 > valor2) {
         setTurnoInicial("Jugador 1");
         setSorteoRealizado(true);
-        setMensajeSorteo(
-          `${jugador1?.nombre_usuario ?? "Jugador 1"} ganó el sorteo.`
-        );
       } else if (valor2 > valor1) {
         setTurnoInicial("Jugador 2");
         setSorteoRealizado(true);
-        setMensajeSorteo(
-          `${jugador2?.nombre_usuario ?? "Jugador 2"} ganó el sorteo.`
-        );
       } else {
         setTurnoInicial(null);
         setSorteoRealizado(false);
-        setMensajeSorteo("Empate en el sorteo. Volvé a lanzar los dados.");
       }
     }, 1200);
   };
@@ -197,10 +168,11 @@ export default function ConfiguracionPage() {
 
     router.push("/juego");
   };
-const formatearPartidaCorta = (partida: PartidaUsuario) => {
-  const fecha = new Date(partida.fecha).toLocaleDateString("es-AR");
-  return `${fecha} vs ${partida.rival_nombre} ${partida.puntos_jugador}-${partida.puntos_rival} pts`;
-};
+
+  const formatearPartidaCorta = (partida: PartidaUsuario) => {
+    const fecha = new Date(partida.fecha).toLocaleDateString("es-AR");
+    return `${fecha} vs ${partida.rival_nombre} ${partida.puntos_jugador ?? 0}-${partida.puntos_rival ?? 0} pts`;
+  };
 
   return (
     <main className="page">
@@ -219,7 +191,7 @@ const formatearPartidaCorta = (partida: PartidaUsuario) => {
               </div>
 
               <div className="top5-ranking-box">
-                <h3 className="top5-title">  TOP 5   </h3>
+                <h3 className="top5-title">TOP 5</h3>
 
                 <div className="top5-list">
                   {cargandoRankingTop5 ? (
@@ -256,7 +228,7 @@ const formatearPartidaCorta = (partida: PartidaUsuario) => {
             </div>
 
             <div className="match-facts-panel">
-              <h2 className="match-title">Las ultimas 5 🔥🔥</h2>
+              <h2 className="match-title">Las últimas 5 🔥🔥</h2>
 
               {cargandoUltimasPartidas ? (
                 <p className="summary-text center-box">Cargando partidas...</p>
@@ -272,27 +244,24 @@ const formatearPartidaCorta = (partida: PartidaUsuario) => {
                     </div>
 
                     {Array.from({ length: 5 }).map((_, index) => {
-  const partidaJ1 = ultimasPartidasJugador1[index];
-  const partidaJ2 = ultimasPartidasJugador2[index];
+                      const partidaJ1 = ultimasPartidasJugador1[index];
+                      const partidaJ2 = ultimasPartidasJugador2[index];
 
-  return (
-    <React.Fragment key={index}>
-      <div>
-        {partidaJ1 ? formatearPartidaCorta(partidaJ1) : "-"}
-      </div>
+                      return (
+                        <Fragment key={index}>
+                          <div>
+                            {partidaJ1 ? formatearPartidaCorta(partidaJ1) : "-"}
+                          </div>
 
-      <div>#{index + 1}</div>
+                          <div>#{index + 1}</div>
 
-      <div>
-        {partidaJ2 ? formatearPartidaCorta(partidaJ2) : "-"}
-      </div>
-    </React.Fragment>
-  );
-})}
+                          <div>
+                            {partidaJ2 ? formatearPartidaCorta(partidaJ2) : "-"}
+                          </div>
+                        </Fragment>
+                      );
+                    })}
                   </div>
-
-                          <p></p>
-                          <p></p>
                 </>
               )}
             </div>

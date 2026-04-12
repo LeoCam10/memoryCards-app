@@ -1,23 +1,9 @@
 import { supabase } from "@/lib/supabase/client";
-
-type RegistrarUsuarioParams = {
-  email: string;
-  password: string;
-  nombreUsuario: string;
-  pais: string;
-  mayor12: boolean;
-};
-
-export type Pais = {
-  id: string;
-  nombre: string;
-};
+import { Pais } from "@/types/pais";
+import { RegistrarUsuarioParams, JugadorPerfil } from "@/types/usuario";
 
 export async function obtenerPaises() {
-  const { data, error } = await supabase
-    .from("paises")
-    .select("id, nombre")
-    .order("nombre", { ascending: true });
+  const { data, error } = await supabase.rpc("obtener_paises");
 
   if (error) throw error;
 
@@ -48,7 +34,7 @@ export async function registrarUsuario({
       id: userId,
       email,
       nombre_usuario: nombreUsuario,
-      pais,
+      pais_id: pais,
       mayor_12: mayor12,
     },
   ]);
@@ -58,7 +44,22 @@ export async function registrarUsuario({
   return data.user;
 }
 
-export async function loginUsuario(email: string, password: string) {
+export async function obtenerPerfilUsuario(
+  userId: string
+): Promise<JugadorPerfil | null> {
+  const { data, error } = await supabase.rpc("obtener_perfil_usuario", {
+    p_user_id: userId,
+  });
+
+  if (error) throw error;
+
+  return (data?.[0] as JugadorPerfil) ?? null;
+}
+
+export async function loginCompleto(
+  email: string,
+  password: string
+): Promise<JugadorPerfil> {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -66,19 +67,18 @@ export async function loginUsuario(email: string, password: string) {
 
   if (error) throw error;
 
-  return data.user;
-}
+  const userId = data.user?.id;
+  if (!userId) {
+    throw new Error("No se pudo obtener el usuario autenticado.");
+  }
 
-export async function obtenerPerfilUsuario(userId: string) {
-  const { data, error } = await supabase
-    .from("usuarios")
-    .select("*")
-    .eq("id", userId)
-    .single();
+  const perfil = await obtenerPerfilUsuario(userId);
 
-  if (error) throw error;
+  if (!perfil) {
+    throw new Error("No se encontró el perfil del usuario.");
+  }
 
-  return data;
+  return perfil;
 }
 
 export async function cerrarSesionUsuario() {

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ResultadoPartida } from "@/types/juego";
-import { formatearTiempo } from "@/utils/formatters";
+import type { ResultadoPartida } from "@/types/partida";
+import { formatearTiempo } from "@/utils/formatearTiempo";
 
 export default function ResultadoPage() {
   const router = useRouter();
@@ -11,40 +11,58 @@ export default function ResultadoPage() {
 
   useEffect(() => {
     const resultadoGuardado = localStorage.getItem("resultadoPartida");
-    if (resultadoGuardado) {
-      setResultado(JSON.parse(resultadoGuardado));
+
+    if (!resultadoGuardado) return;
+
+    try {
+      const parsed = JSON.parse(resultadoGuardado) as ResultadoPartida;
+      setResultado(parsed);
+    } catch (error) {
+      console.error("Error al leer resultadoPartida:", error);
+      setResultado(null);
     }
   }, []);
-
-  const volverAConfiguracion = () => {
-    router.push("/configuracion");
-  };
-
-  const volverAInicio = () => {
-    router.push("/");
-  };
-
-  const valorGanadorJugador1 =
-    resultado?.ganador === resultado?.jugador1Nombre ? "✅" : "-";
-
-  const valorGanadorJugador2 =
-    resultado?.ganador === resultado?.jugador2Nombre ? "✅" : "-";
-
-  const valorComenzoJugador1 =
-    resultado?.ganadorSorteo === "Jugador 1" ? "Sí" : "-";
-
-  const valorComenzoJugador2 =
-    resultado?.ganadorSorteo === "Jugador 2" ? "Sí" : "-";
 
   if (!resultado) {
     return (
       <main className="page">
         <div className="container">
           <h1 className="page-title">No hay resultado disponible</h1>
+
+          <div className="page-actions">
+            <button
+              onClick={() => router.push("/configuracion")}
+              className="btn btn-primary"
+            >
+              Ir a configuración
+            </button>
+
+            <button
+              onClick={() => router.push("/")}
+              className="btn btn-secondary"
+            >
+              Volver a inicio
+            </button>
+          </div>
         </div>
       </main>
     );
   }
+
+  const ganadorJugador1 =
+    resultado.ganador === resultado.jugador1Nombre ? "✅" : "-";
+
+  const ganadorJugador2 =
+    resultado.ganador === resultado.jugador2Nombre ? "✅" : "-";
+
+  const motivoTexto =
+    resultado.motivo === "completado"
+      ? "Se descubrieron todos los pares"
+      : resultado.motivo === "max_intentos"
+      ? "Se alcanzó el máximo de intentos"
+      : resultado.motivo === "abandono"
+      ? "Un jugador abandonó la partida"
+      : "Se agotó el tiempo máximo";
 
   return (
     <main className="page">
@@ -62,9 +80,9 @@ export default function ResultadoPage() {
             <div>Jugador</div>
             <div>{resultado.jugador2Nombre}</div>
 
-            <div>{valorGanadorJugador1}</div>
+            <div>{ganadorJugador1}</div>
             <div>Ganador</div>
-            <div>{valorGanadorJugador2}</div>
+            <div>{ganadorJugador2}</div>
 
             <div>{resultado.aciertosJugador1}</div>
             <div>Aciertos</div>
@@ -77,17 +95,13 @@ export default function ResultadoPage() {
             <div>{resultado.puntosFinalesJugador1}</div>
             <div>Puntos</div>
             <div>{resultado.puntosFinalesJugador2}</div>
-
-            <div>{resultado.dadoJugador1 ?? "-"}</div>
-            <div>Dado del sorteo</div>
-            <div>{resultado.dadoJugador2 ?? "-"}</div>
-
-            <div>{valorComenzoJugador1}</div>
-            <div>Comenzó</div>
-            <div>{valorComenzoJugador2}</div>
           </div>
 
           <div className="match-extra">
+            <p>
+              <strong>Motivo de finalización:</strong> {motivoTexto}
+            </p>
+
             <p>
               <strong>Mensaje:</strong> {resultado.mensaje}
             </p>
@@ -100,14 +114,14 @@ export default function ResultadoPage() {
 
           <div className="result-actions">
             <button
-              onClick={volverAConfiguracion}
+              onClick={() => router.push("/configuracion")}
               className="btn btn-primary"
             >
               Jugar otra partida
             </button>
 
             <button
-              onClick={volverAInicio}
+              onClick={() => router.push("/")}
               className="btn btn-secondary"
             >
               Volver a inicio

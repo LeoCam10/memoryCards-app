@@ -1,4 +1,4 @@
-import type { Pais } from "@/types/auth";
+import { Pais } from "@/types/pais";
 
 export function filtrarPaises(paises: Pais[], valor: string): Pais[] {
   if (!valor.trim()) return [];

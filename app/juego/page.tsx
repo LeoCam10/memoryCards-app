@@ -3,88 +3,29 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { guardarPartidaCompleta } from "@/services/partidaService";
+import { animales, numeros, colores } from "@/data/cartas";
+import { Carta, ConfiguracionPartida, MotivoFin } from "@/types/partida";
+import { JugadorPerfil } from "@/types/usuario";
 
-
-
-type Carta = {
-  id: number;
-  valor: string;
-  descubierta: boolean;
-  acertada: boolean;
+type ResultadoPartida = {
+  motivo: MotivoFin;
+  ganador: string;
+  mensaje: string;
+  jugador1Nombre: string;
+  jugador2Nombre: string;
+  aciertosJugador1: number;
+  aciertosJugador2: number;
+  intentosJugador1: number;
+  intentosJugador2: number;
+  puntosFinalesJugador1: number;
+  puntosFinalesJugador2: number;
+  tiempoJugado: number;
+  tiempoConfigurado: number | null;
+  dadoJugador1: number | null;
+  dadoJugador2: number | null;
+  ganadorSorteo: "Jugador 1" | "Jugador 2" | null;
+  numeroPartida: number;
 };
-
-type ConfiguracionPartida = {
-  dificultad: "baja" | "media" | "alta";
-  tiempo: number | null;
-  tipoCartas: string;
-};
-
-type MotivoFin = "completado" | "max_intentos" | "abandono" | "tiempo_agotado";
-
-type Usuario = {
-  id: string;
-  nombre_usuario: string;
-  contrasena: string;
-  pais: string;
-  mayor_12: boolean;
-};
-
-
-const animales = [
-  "/cartas/avestruz.jpeg",
-  "/cartas/ballena.jpeg",
-  "/cartas/buey.jpeg",
-  "/cartas/bufalo.jpeg",
-  "/cartas/cabra.jpeg",
-  "/cartas/cocodrilo.jpeg",
-  "/cartas/condor.jpeg",
-  "/cartas/elefante.jpeg",
-  "/cartas/gallina.jpeg",
-  "/cartas/gorila.jpeg",
-  "/cartas/leon.jpeg",
-  "/cartas/mono.jpeg",
-  "/cartas/oso.jpeg",
-  "/cartas/perro.jpeg",
-  "/cartas/pollito.jpeg",
-  "/cartas/serpiente.jpeg",
-];
-
-const numeros = [
-  "/cartas/uno.jpeg",
-  "/cartas/dos.jpeg",
-  "/cartas/tres.jpeg",
-  "/cartas/cuatro.jpeg",
-  "/cartas/cinco.jpeg",
-  "/cartas/seis.jpeg",
-  "/cartas/siete.jpeg",
-  "/cartas/ocho.jpeg",
-  "/cartas/nueve.jpeg",
-  "/cartas/diez.jpeg",
-  "/cartas/once.jpeg",
-  "/cartas/doce.jpeg",
-  "/cartas/trece.jpeg",
-  "/cartas/catorce.jpeg",
-  "/cartas/quince.jpeg",
-  "/cartas/dieciseis.jpeg",
-];
-const colores = [
-  "/cartas/amarrillo.jpeg",
-  "/cartas/anaranjado.jpeg",
-  "/cartas/azul oscuro.jpeg",
-  "/cartas/blanco.jpeg",
-  "/cartas/bordo.jpeg",
-  "/cartas/celeste.jpeg",
-  "/cartas/fuscia.jpeg",
-  "/cartas/gris.jpeg",
-  "/cartas/marron.jpeg",
-  "/cartas/negro.jpeg",
-  "/cartas/oliva.jpeg",
-  "/cartas/rojo.jpeg",
-  "/cartas/rosa.jpeg",
-  "/cartas/turquesa.jpeg",
-  "/cartas/verde claro.jpeg",
-  "/cartas/verde oscuro.jpeg",
-];
 
 export default function JuegoPage() {
   const router = useRouter();
@@ -94,8 +35,8 @@ export default function JuegoPage() {
     useState<ConfiguracionPartida | null>(null);
   const [numeroPartidaActual, setNumeroPartidaActual] = useState(1);
 
-  const [jugador1, setJugador1] = useState<Usuario | null>(null);
-  const [jugador2, setJugador2] = useState<Usuario | null>(null);
+  const [jugador1, setJugador1] = useState<JugadorPerfil | null>(null);
+  const [jugador2, setJugador2] = useState<JugadorPerfil | null>(null);
 
   const [turnoActual, setTurnoActual] = useState<
     "Jugador 1" | "Jugador 2" | null
@@ -128,17 +69,8 @@ export default function JuegoPage() {
   };
 
   const generarCartas = (tipo: string, dificultad: string): Carta[] => {
-    let valores: string[] = [];
-
-
-
-if (tipo === "animales") {
-  valores = animales;
-} else if (tipo === "numeros") {
-  valores = numeros;
-} else if (tipo === "colores") {
-  valores = colores;
-}
+    const mapa = { animales, numeros, colores };
+    const valores = mapa[tipo as keyof typeof mapa] || [];
 
     const cantidadPares = obtenerCantidadPares(dificultad);
     const seleccionados = valores.slice(0, cantidadPares);
@@ -154,35 +86,30 @@ if (tipo === "animales") {
   };
 
   useEffect(() => {
-    const configuracionGuardada = localStorage.getItem("configuracionPartida");
+    const configGuardada = localStorage.getItem("configuracionPartida");
     const jugadoresGuardados = localStorage.getItem("jugadoresLogueados");
-    const numeroPartidaGuardado = localStorage.getItem("numeroPartidaActual");
+    const numeroPartida = localStorage.getItem("numeroPartidaActual");
     const turnoInicialGuardado = localStorage.getItem("turnoInicial");
 
-    if (configuracionGuardada) {
-      const config: ConfiguracionPartida = JSON.parse(configuracionGuardada);
-      setConfiguracion(config);
-
-      if (config.tiempo === null) setTiempoRestante(null);
-      else setTiempoRestante(config.tiempo * 60);
-
-      setCartas(generarCartas(config.tipoCartas, config.dificultad));
-    } else {
-      router.push("/configuracion");
-      return;
-    }
-
-    if (jugadoresGuardados) {
-      const parsed = JSON.parse(jugadoresGuardados);
-      setJugador1(parsed.jugador1);
-      setJugador2(parsed.jugador2);
-    } else {
+    if (!configGuardada || !jugadoresGuardados) {
       router.push("/");
       return;
     }
 
-    if (numeroPartidaGuardado) {
-      setNumeroPartidaActual(Number(numeroPartidaGuardado));
+    const config: ConfiguracionPartida = JSON.parse(configGuardada);
+    const jugadores = JSON.parse(jugadoresGuardados);
+
+    setConfiguracion(config);
+    setJugador1(jugadores.jugador1);
+    setJugador2(jugadores.jugador2);
+
+    setCartas(generarCartas(config.tipoCartas, config.dificultad));
+
+    if (config.tiempo === null) setTiempoRestante(null);
+    else setTiempoRestante(config.tiempo * 60);
+
+    if (numeroPartida) {
+      setNumeroPartidaActual(Number(numeroPartida));
     }
 
     if (
@@ -195,6 +122,21 @@ if (tipo === "animales") {
       router.push("/configuracion");
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!configuracion || tiempoRestante === null) return;
+
+    if (tiempoRestante <= 0) {
+      finalizarPartida("tiempo_agotado");
+      return;
+    }
+
+    const intervalo = setInterval(() => {
+      setTiempoRestante((prev) => (prev === null ? null : prev - 1));
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [tiempoRestante, configuracion]);
 
   const formatearTiempo = (segundos: number | null) => {
     if (segundos === null) return "Sin límite";
@@ -223,216 +165,15 @@ if (tipo === "animales") {
     return "¡¡¡Mala memoria, debes practicar más!!!";
   };
 
-  const finalizarPartida = async (motivo: MotivoFin) => {
-    if (redireccionandoRef.current) return;
-    redireccionandoRef.current = true;
-
-    const totalPares = cartas.length / 2;
-
-    let ganador = "";
-    let mensaje = "";
-    let ganadorUsuarioId: string | null = null;
-    let puntosFinalesJugador1 = 0;
-    let puntosFinalesJugador2 = 0;
-
-    if (motivo === "completado") {
-      if (aciertosJugador1 > aciertosJugador2) {
-        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-        ganadorUsuarioId = jugador1?.id ?? null;
-        puntosFinalesJugador1 = 12;
-        const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
-        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-      } else if (aciertosJugador2 > aciertosJugador1) {
-        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-        ganadorUsuarioId = jugador2?.id ?? null;
-        puntosFinalesJugador2 = 12;
-        const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
-        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-      } else {
-        if (intentosJugador1 < intentosJugador2) {
-          ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-          ganadorUsuarioId = jugador1?.id ?? null;
-          puntosFinalesJugador1 = 8;
-          puntosFinalesJugador2 = 4;
-          const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
-          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-        } else if (intentosJugador2 < intentosJugador1) {
-          ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-          ganadorUsuarioId = jugador2?.id ?? null;
-          puntosFinalesJugador2 = 8;
-          puntosFinalesJugador1 = 4;
-          const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
-          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-        } else {
-          ganador = "Empate";
-          puntosFinalesJugador1 = 6;
-          puntosFinalesJugador2 = 6;
-          mensaje = "La partida terminó en empate.";
-        }
-      }
-    }
-
-    if (motivo === "max_intentos") {
-      if (aciertosJugador1 > aciertosJugador2) {
-        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-        ganadorUsuarioId = jugador1?.id ?? null;
-        puntosFinalesJugador1 = 7;
-        const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
-        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-      } else if (aciertosJugador2 > aciertosJugador1) {
-        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-        ganadorUsuarioId = jugador2?.id ?? null;
-        puntosFinalesJugador2 = 7;
-        const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
-        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-      } else {
-        if (intentosJugador1 < intentosJugador2) {
-          ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-          ganadorUsuarioId = jugador1?.id ?? null;
-          puntosFinalesJugador1 = 5;
-          puntosFinalesJugador2 = 2;
-          const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
-          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-        } else if (intentosJugador2 < intentosJugador1) {
-          ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-          ganadorUsuarioId = jugador2?.id ?? null;
-          puntosFinalesJugador2 = 5;
-          puntosFinalesJugador1 = 2;
-          const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
-          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
-        } else {
-          ganador = "Empate";
-          puntosFinalesJugador1 = 3;
-          puntosFinalesJugador2 = 3;
-          mensaje =
-            "Se alcanzó el máximo de intentos. La partida terminó en empate.";
-        }
-      }
-    }
-
-    if (motivo === "abandono") {
-      let nombreAbandono = "";
-
-      if (turnoActual === "Jugador 1") {
-        nombreAbandono = jugador1?.nombre_usuario ?? "Jugador 1";
-        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-        ganadorUsuarioId = jugador2?.id ?? null;
-        puntosFinalesJugador2 = 3;
-      } else {
-        nombreAbandono = jugador2?.nombre_usuario ?? "Jugador 2";
-        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-        ganadorUsuarioId = jugador1?.id ?? null;
-        puntosFinalesJugador1 = 3;
-      }
-
-      mensaje = `${nombreAbandono} abandonó la partida. ${ganador} gana automáticamente.`;
-    }
-
-    if (motivo === "tiempo_agotado") {
-      ganador = "Sin ganador";
-
-      if (aciertosJugador1 < aciertosJugador2) puntosFinalesJugador1 = -5;
-      else if (aciertosJugador2 < aciertosJugador1) puntosFinalesJugador2 = -5;
-
-      mensaje =
-        "Se agotó el tiempo máximo. Ambos jugadores pierden la partida.";
-    }
-
-    const tiempoConfiguradoEnSegundos =
-      configuracion?.tiempo === null ? null : (configuracion?.tiempo ?? 0) * 60;
-
-    const tiempoJugado =
-      tiempoConfiguradoEnSegundos === null || tiempoRestante === null
-        ? 0
-        : tiempoConfiguradoEnSegundos - tiempoRestante;
-
-    if (jugador1 && jugador2) {
-      try {
-        await guardarPartidaCompleta({
-          motivo,
-          tiempoJugado,
-          tiempoConfigurado: configuracion?.tiempo ?? null,
-          ganadorUsuarioId,
-          jugador1: {
-            id: jugador1.id,
-            aciertos: aciertosJugador1,
-            intentos: intentosJugador1,
-            puntosObtenidos: puntosFinalesJugador1,
-            abandono: motivo === "abandono" && turnoActual === "Jugador 1",
-          },
-          jugador2: {
-            id: jugador2.id,
-            aciertos: aciertosJugador2,
-            intentos: intentosJugador2,
-            puntosObtenidos: puntosFinalesJugador2,
-            abandono: motivo === "abandono" && turnoActual === "Jugador 2",
-          },
-        });
-      } catch (error: any) {
-  console.error("Error guardando partida completa:", error);
-  console.error("Mensaje:", error?.message);
-  console.error("Detalles:", error?.details);
-  console.error("Hint:", error?.hint);
-  console.error("Code:", error?.code);
-  alert(
-    `Error al guardar partida:\n${error?.message ?? "Sin mensaje"}\n${error?.details ?? ""}`
-  );
-}
-    }
-
-    const dado1 = localStorage.getItem("dadoJugador1");
-    const dado2 = localStorage.getItem("dadoJugador2");
-
-    const resultado = {
-      motivo,
-      ganador,
-      mensaje,
-      jugador1Nombre: jugador1?.nombre_usuario ?? "Jugador 1",
-      jugador2Nombre: jugador2?.nombre_usuario ?? "Jugador 2",
-      aciertosJugador1,
-      aciertosJugador2,
-      intentosJugador1,
-      intentosJugador2,
-      puntosFinalesJugador1,
-      puntosFinalesJugador2,
-      tiempoJugado,
-      tiempoConfigurado: configuracion?.tiempo ?? null,
-      dadoJugador1: dado1 ? Number(dado1) : null,
-      dadoJugador2: dado2 ? Number(dado2) : null,
-      ganadorSorteo: turnoInicial,
-      numeroPartida: numeroPartidaActual,
-    };
-
-    localStorage.setItem("resultadoPartida", JSON.stringify(resultado));
-    router.push("/resultado");
-  };
-
-  useEffect(() => {
-    if (!configuracion || tiempoRestante === null) return;
-
-    if (tiempoRestante <= 0) {
-      finalizarPartida("tiempo_agotado");
-      return;
-    }
-
-    const intervalo = setInterval(() => {
-      setTiempoRestante((prev) => (prev === null ? null : prev - 1));
-    }, 1000);
-
-    return () => clearInterval(intervalo);
-  }, [tiempoRestante, configuracion]);
-
   const seleccionarCarta = (id: number) => {
     if (redireccionandoRef.current || !turnoActual) return;
 
-    const cartaSeleccionada = cartas.find((carta) => carta.id === id);
-
-    if (!cartaSeleccionada) return;
-    if (cartaSeleccionada.descubierta || cartaSeleccionada.acertada) return;
+    const carta = cartas.find((c) => c.id === id);
+    if (!carta || carta.descubierta || carta.acertada) return;
     if (cartasSeleccionadas.length === 2) return;
 
-    const nuevasCartas = cartas.map((carta) =>
-      carta.id === id ? { ...carta, descubierta: true } : carta
+    const nuevasCartas = cartas.map((c) =>
+      c.id === id ? { ...c, descubierta: true } : c
     );
 
     const nuevasSeleccionadas = [...cartasSeleccionadas, id];
@@ -441,36 +182,33 @@ if (tipo === "animales") {
     setCartasSeleccionadas(nuevasSeleccionadas);
 
     if (nuevasSeleccionadas.length === 2) {
-      if (turnoActual === "Jugador 1") setIntentosJugador1((prev) => prev + 1);
-      else setIntentosJugador2((prev) => prev + 1);
+      if (turnoActual === "Jugador 1") setIntentosJugador1((p) => p + 1);
+      else setIntentosJugador2((p) => p + 1);
 
       const [id1, id2] = nuevasSeleccionadas;
-      const carta1 = nuevasCartas.find((carta) => carta.id === id1);
-      const carta2 = nuevasCartas.find((carta) => carta.id === id2);
+      const c1 = nuevasCartas.find((c) => c.id === id1);
+      const c2 = nuevasCartas.find((c) => c.id === id2);
 
-      if (!carta1 || !carta2) return;
+      if (!c1 || !c2) return;
 
-      if (carta1.valor === carta2.valor) {
-        if (turnoActual === "Jugador 1") setAciertosJugador1((prev) => prev + 1);
-        else setAciertosJugador2((prev) => prev + 1);
+      if (c1.valor === c2.valor) {
+        if (turnoActual === "Jugador 1") setAciertosJugador1((p) => p + 1);
+        else setAciertosJugador2((p) => p + 1);
 
         setTimeout(() => {
           setCartas((prev) => {
-            const nuevas = prev.map((carta) =>
-              carta.id === id1 || carta.id === id2
-                ? { ...carta, acertada: true }
-                : carta
+            const actualizadas = prev.map((c) =>
+              c.id === id1 || c.id === id2 ? { ...c, acertada: true } : c
             );
 
-            const todasAcertadas = nuevas.every((carta) => carta.acertada);
-
+            const todasAcertadas = actualizadas.every((c) => c.acertada);
             if (todasAcertadas) {
               setTimeout(() => {
                 finalizarPartida("completado");
-              }, 1000);
+              }, 300);
             }
 
-            return nuevas;
+            return actualizadas;
           });
 
           setCartasSeleccionadas([]);
@@ -478,10 +216,10 @@ if (tipo === "animales") {
       } else {
         setTimeout(() => {
           setCartas((prev) =>
-            prev.map((carta) =>
-              carta.id === id1 || carta.id === id2
-                ? { ...carta, descubierta: false }
-                : carta
+            prev.map((c) =>
+              c.id === id1 || c.id === id2
+                ? { ...c, descubierta: false }
+                : c
             )
           );
 
@@ -494,17 +232,170 @@ if (tipo === "animales") {
     }
   };
 
+  const finalizarPartida = async (motivo: MotivoFin) => {
+    if (redireccionandoRef.current) return;
+    redireccionandoRef.current = true;
+
+    const totalPares = cartas.length / 2;
+    const tiempoConfiguradoEnSegundos =
+      configuracion?.tiempo === null ? null : (configuracion?.tiempo ?? 0) * 60;
+
+    const tiempoJugado =
+      tiempoConfiguradoEnSegundos === null || tiempoRestante === null
+        ? 0
+        : tiempoConfiguradoEnSegundos - tiempoRestante;
+
+    let ganador = "";
+    let mensaje = "";
+    let ganadorUsuarioId: string | null = null;
+    let puntos1 = 0;
+    let puntos2 = 0;
+
+    if (motivo === "completado") {
+      if (aciertosJugador1 > aciertosJugador2) {
+        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganadorUsuarioId = jugador1?.id ?? null;
+        puntos1 = 12;
+        const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
+        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+      } else if (aciertosJugador2 > aciertosJugador1) {
+        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganadorUsuarioId = jugador2?.id ?? null;
+        puntos2 = 12;
+        const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
+        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+      } else {
+        if (intentosJugador1 < intentosJugador2) {
+          ganador = jugador1?.nombre_usuario ?? "Jugador 1";
+          ganadorUsuarioId = jugador1?.id ?? null;
+          puntos1 = 8;
+          puntos2 = 4;
+          const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
+          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+        } else if (intentosJugador2 < intentosJugador1) {
+          ganador = jugador2?.nombre_usuario ?? "Jugador 2";
+          ganadorUsuarioId = jugador2?.id ?? null;
+          puntos2 = 8;
+          puntos1 = 4;
+          const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
+          mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+        } else {
+          ganador = "Empate";
+          puntos1 = 6;
+          puntos2 = 6;
+          mensaje = "La partida terminó en empate.";
+        }
+      }
+    }
+
+    if (motivo === "max_intentos") {
+      if (aciertosJugador1 > aciertosJugador2) {
+        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganadorUsuarioId = jugador1?.id ?? null;
+        puntos1 = 7;
+        const porcentaje = Math.round((aciertosJugador1 / totalPares) * 100);
+        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+      } else if (aciertosJugador2 > aciertosJugador1) {
+        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganadorUsuarioId = jugador2?.id ?? null;
+        puntos2 = 7;
+        const porcentaje = Math.round((aciertosJugador2 / totalPares) * 100);
+        mensaje = obtenerMensajePorRendimiento(true, porcentaje);
+      } else {
+        ganador = "Empate";
+        puntos1 = 5;
+        puntos2 = 5;
+        mensaje =
+          "Se alcanzó el máximo de intentos. La partida terminó en empate.";
+      }
+    }
+
+    if (motivo === "abandono") {
+      let nombreAbandono = "";
+
+      if (turnoActual === "Jugador 1") {
+        nombreAbandono = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganadorUsuarioId = jugador2?.id ?? null;
+        puntos2 = 3;
+      } else {
+        nombreAbandono = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganadorUsuarioId = jugador1?.id ?? null;
+        puntos1 = 3;
+      }
+
+      mensaje = `${nombreAbandono} abandonó la partida. ${ganador} gana automáticamente.`;
+    }
+
+    if (motivo === "tiempo_agotado") {
+      ganador = "Sin ganador";
+
+      if (aciertosJugador1 < aciertosJugador2) {
+        puntos1 = -5;
+      } else if (aciertosJugador2 < aciertosJugador1) {
+        puntos2 = -5;
+      }
+
+      mensaje =
+        "Se agotó el tiempo máximo. Ambos jugadores pierden la partida.";
+    }
+
+    if (jugador1 && jugador2) {
+      await guardarPartidaCompleta({
+        motivo,
+        tiempoJugado,
+        tiempoConfigurado: configuracion?.tiempo ?? null,
+        ganadorUsuarioId,
+        jugador1: {
+          id: jugador1.id,
+          aciertos: aciertosJugador1,
+          intentos: intentosJugador1,
+          puntosObtenidos: puntos1,
+          abandono: motivo === "abandono" && turnoActual === "Jugador 1",
+        },
+        jugador2: {
+          id: jugador2.id,
+          aciertos: aciertosJugador2,
+          intentos: intentosJugador2,
+          puntosObtenidos: puntos2,
+          abandono: motivo === "abandono" && turnoActual === "Jugador 2",
+        },
+      });
+    }
+
+    const dado1 = localStorage.getItem("dadoJugador1");
+    const dado2 = localStorage.getItem("dadoJugador2");
+
+    const resultado: ResultadoPartida = {
+      motivo,
+      ganador,
+      mensaje,
+      jugador1Nombre: jugador1?.nombre_usuario ?? "Jugador 1",
+      jugador2Nombre: jugador2?.nombre_usuario ?? "Jugador 2",
+      aciertosJugador1,
+      aciertosJugador2,
+      intentosJugador1,
+      intentosJugador2,
+      puntosFinalesJugador1: puntos1,
+      puntosFinalesJugador2: puntos2,
+      tiempoJugado,
+      tiempoConfigurado: configuracion?.tiempo ?? null,
+      dadoJugador1: dado1 ? Number(dado1) : null,
+      dadoJugador2: dado2 ? Number(dado2) : null,
+      ganadorSorteo: turnoInicial,
+      numeroPartida: numeroPartidaActual,
+    };
+
+    localStorage.setItem("resultadoPartida", JSON.stringify(resultado));
+    router.push("/resultado");
+  };
+
   const maximoIntentos = configuracion
     ? obtenerMaximoIntentos(configuracion.dificultad)
     : 0;
 
   const intentosTotales = intentosJugador1 + intentosJugador2;
-
-  const columnasTablero = configuracion
-    ? configuracion.dificultad === "alta"
-      ? 8
-      : 4
-    : 4;
 
   useEffect(() => {
     if (!configuracion || redireccionandoRef.current) return;
@@ -514,87 +405,79 @@ if (tipo === "animales") {
     }
   }, [intentosTotales, maximoIntentos, configuracion]);
 
+  const columnas = configuracion?.dificultad === "alta" ? 8 : 4;
+
   return (
     <main className="page">
       <div className="container">
-        <div className="game-top-unificado">
-          <div className="top-item info-box-small">
-            <p>
-              <strong>Partida:</strong>{" "}
-              <span className="highlight">#{numeroPartidaActual}</span>
-            </p>
-            <p><strong>Intentos máx:</strong> {maximoIntentos}</p>
-            <p><strong>Intentos:</strong> {intentosTotales}</p>
-          </div>
-
-          <div className="top-item versus-box">
-            <div className="versus-row versus-names">
-              <span>{jugador1?.nombre_usuario ?? "Jugador 1"}</span>
-              <span></span>
-              <span>{jugador2?.nombre_usuario ?? "Jugador 2"}</span>
-            </div>
-
-            <div className="versus-row">
-              <span>{aciertosJugador1}</span>
-              <span>Aciertos</span>
-              <span>{aciertosJugador2}</span>
-            </div>
-
-            <div className="versus-row">
-              <span>{intentosJugador1}</span>
-              <span>Intentos</span>
-              <span>{intentosJugador2}</span>
-            </div>
-          </div>
-
-          <div className="top-item turno-box-small">
-            <span>Turno</span>
-
-            <strong className="turno-nombre">
-              {turnoActual === "Jugador 1"
-                ? jugador1?.nombre_usuario
-                : turnoActual === "Jugador 2"
-                ? jugador2?.nombre_usuario
-                : "—"}
+        <div className="juego-panel-unico">
+          <div className="juego-panel-columna juego-panel-info">
+            <span className="juego-panel-label">Partida</span>
+            <strong className="juego-panel-partida-numero highlight">
+              #{numeroPartidaActual}
             </strong>
 
-            <div className="mini-timer">
+            <p>
+              <strong>Intentos máx:</strong> {maximoIntentos}
+            </p>
+            <p>
+              <strong>Intentos totales:</strong> {intentosTotales}
+            </p>
+          </div>
+
+          <div className="juego-panel-columna juego-panel-jugadores">
+            <div className="juego-panel-jugador-bloque">
+              <h3>{jugador1?.nombre_usuario ?? "Jugador 1"}</h3>
+              <p>Aciertos: {aciertosJugador1}</p>
+              <p>Intentos: {intentosJugador1}</p>
+            </div>
+
+            <div className="juego-panel-jugador-bloque">
+              <h3>{jugador2?.nombre_usuario ?? "Jugador 2"}</h3>
+              <p>Aciertos: {aciertosJugador2}</p>
+              <p>Intentos: {intentosJugador2}</p>
+            </div>
+          </div>
+
+          <div className="juego-panel-columna juego-panel-turno">
+            <span className="juego-panel-label">Turno actual</span>
+            <strong className="juego-panel-turno-nombre">
+              {turnoActual === "Jugador 1"
+                ? jugador1?.nombre_usuario ?? "Jugador 1"
+                : turnoActual === "Jugador 2"
+                ? jugador2?.nombre_usuario ?? "Jugador 2"
+                : "No definido"}
+            </strong>
+
+            <div className="mini-timer juego-panel-timer">
               {formatearTiempo(tiempoRestante)}
             </div>
 
             <button
-              className="btn btn-danger btn-small"
+              className="btn btn-danger"
               onClick={() => finalizarPartida("abandono")}
             >
-              Abandonar partida
+              Abandonar
             </button>
           </div>
         </div>
 
         <div
           className="game-board"
-          style={{ gridTemplateColumns: `repeat(${columnasTablero}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${columnas}, 1fr)` }}
         >
           {cartas.map((carta) => (
-           <button
-  key={carta.id}
-  onClick={() => seleccionarCarta(carta.id)}
-  className={`memory-card ${carta.acertada ? "success" : ""}`}
->
-  {carta.descubierta || carta.acertada ? (
-    carta.valor.includes("/cartas/") ? (
-      <img
-        src={carta.valor}
-        alt="carta"
-        className="carta-imagen"
-      />
-    ) : (
-      <span className="carta-texto">{carta.valor}</span>
-    )
-  ) : (
-    <span className="carta-texto">?</span>
-  )}
-</button>
+            <button
+              key={carta.id}
+              onClick={() => seleccionarCarta(carta.id)}
+              className={`memory-card ${carta.acertada ? "success" : ""}`}
+            >
+              {carta.descubierta || carta.acertada ? (
+                <img src={carta.valor} alt="Carta" className="carta-imagen" />
+              ) : (
+                "?"
+              )}
+            </button>
           ))}
         </div>
       </div>
