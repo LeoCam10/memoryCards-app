@@ -59,6 +59,7 @@ export type PartidaEnComun = {
   jugador2_nombre: string;
   puntos_jugador1: number;
   puntos_jugador2: number;
+  total_partidas: number;
 };
 
 export type RankingItem = {

@@ -8,7 +8,10 @@ import {
   RankingItem,
 } from "@/types/partida";
 import { obtenerRanking } from "@/services/rankingService";
-import { obtenerPartidasUsuario } from "@/services/partidaService";
+import {
+  obtenerPartidasUsuario,
+  obtenerPartidasEnComun,
+} from "@/services/partidaService";
 import { JugadorPerfil } from "@/types/usuario";
 
 
@@ -142,16 +145,26 @@ export default function ConfiguracionPage() {
     }, 1200);
   };
 
-  const iniciarPartida = () => {
-    if (!sorteoRealizado || !turnoInicial) {
-      alert("Primero debés realizar el sorteo para definir quién empieza.");
-      return;
-    }
+ const iniciarPartida = async () => {
+  if (!sorteoRealizado || !turnoInicial) {
+    alert("Primero debés realizar el sorteo para definir quién empieza.");
+    return;
+  }
 
-    const ultimoNumeroGuardado = localStorage.getItem("ultimoNumeroPartida");
-    const nuevoNumero = ultimoNumeroGuardado
-      ? Number(ultimoNumeroGuardado) + 1
-      : 1;
+  if (!jugador1 || !jugador2) {
+    alert("No se encontraron los jugadores logueados.");
+    return;
+  }
+
+  try {
+    const partidasEnComun = await obtenerPartidasEnComun(
+      jugador1.id,
+      jugador2.id,
+      1
+    );
+
+    const totalPartidas = partidasEnComun[0]?.total_partidas ?? 0;
+    const nuevoNumero = totalPartidas + 1;
 
     const configuracion: ConfiguracionPartida = {
       dificultad,
@@ -159,7 +172,6 @@ export default function ConfiguracionPage() {
       tipoCartas,
     };
 
-    localStorage.setItem("ultimoNumeroPartida", String(nuevoNumero));
     localStorage.setItem("numeroPartidaActual", String(nuevoNumero));
     localStorage.setItem("configuracionPartida", JSON.stringify(configuracion));
     localStorage.setItem("turnoInicial", turnoInicial);
@@ -167,7 +179,11 @@ export default function ConfiguracionPage() {
     localStorage.setItem("dadoJugador2", String(dadoJugador2 ?? ""));
 
     router.push("/juego");
-  };
+  } catch (error) {
+    console.error("Error al calcular el número de partida:", error);
+    alert("No se pudo iniciar la partida.");
+  }
+};
 
   const formatearPartidaCorta = (partida: PartidaUsuario) => {
     const fecha = new Date(partida.fecha).toLocaleDateString("es-AR");
