@@ -8,7 +8,7 @@ import {
   EstadoLogin,
 
 } from "@/types/usuario";
-
+import { traducirErrorSupabase } from "@/utils/traducirErrores";
 import {
   PartidaUsuario,
   PartidaEnComun,
@@ -219,13 +219,15 @@ export default function HomePage() {
         password: "",
         error: "",
       }));
-    } catch (error: any) {
-      setEstado((prev) => ({
-        ...prev,
-        cargando: false,
-        error: error.message ?? "Error al iniciar sesión.",
-      }));
-    }
+   } catch (error: any) {
+  const mensaje = traducirErrorSupabase(error.message);
+
+  setEstado((prev) => ({
+    ...prev,
+    cargando: false,
+    error: mensaje,
+  }));
+}
   };
 
   const cerrarSesionLocal = async (numero: 1 | 2) => {
@@ -261,7 +263,7 @@ export default function HomePage() {
     setRegistroError("");
     setRegistroMensaje("");
 
-    // Campos obligatorios
+
     if (
       !registroEmail ||
       !registroPassword ||
@@ -272,25 +274,25 @@ export default function HomePage() {
       return;
     }
 
-    // Mayor de edad
+
     if (!registroMayor12) {
       setRegistroError("Debés confirmar que sos mayor de 12 años.");
       return;
     }
 
-    // Email válido
+
     if (!registroEmail.includes("@")) {
       setRegistroError("Ingresá un email válido.");
       return;
     }
 
-    // Contraseña mínima
+
     if (registroPassword.length < 6) {
       setRegistroError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
-    // Usuario mínimo
+
     if (registroNombreUsuario.trim().length < 3) {
       setRegistroError("El nombre de usuario debe tener al menos 3 caracteres.");
       return;
@@ -300,7 +302,7 @@ export default function HomePage() {
       email: registroEmail,
       password: registroPassword,
       nombreUsuario: registroNombreUsuario,
-      pais: registroPaisId,
+      pais_id: registroPaisId,
       mayor12: registroMayor12,
     });
 
@@ -320,18 +322,9 @@ export default function HomePage() {
     }, 1200);
 
   } catch (error: any) {
-    const mensaje = error.message?.toLowerCase() || "";
-
-    if (mensaje.includes("usuario") || mensaje.includes("username")) {
-      setRegistroError("El nombre de usuario ya está en uso.");
-    } else if (mensaje.includes("email")) {
-      setRegistroError("El email ya está registrado.");
-    } else if (mensaje.includes("duplicate")) {
-      setRegistroError("El usuario o email ya existen.");
-    } else {
-      setRegistroError("Error al registrar. Intentá nuevamente.");
-    }
-  }
+  const mensaje = traducirErrorSupabase(error.message);
+  setRegistroError(mensaje);
+}
 };
 
   const continuar = () => {
