@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { guardarPartidaCompleta } from "@/services/partidaService";
+
+
 
 type Carta = {
   id: number;
@@ -26,6 +28,63 @@ type Usuario = {
   pais: string;
   mayor_12: boolean;
 };
+
+
+const animales = [
+  "/cartas/avestruz.jpeg",
+  "/cartas/ballena.jpeg",
+  "/cartas/buey.jpeg",
+  "/cartas/bufalo.jpeg",
+  "/cartas/cabra.jpeg",
+  "/cartas/cocodrilo.jpeg",
+  "/cartas/condor.jpeg",
+  "/cartas/elefante.jpeg",
+  "/cartas/gallina.jpeg",
+  "/cartas/gorila.jpeg",
+  "/cartas/leon.jpeg",
+  "/cartas/mono.jpeg",
+  "/cartas/oso.jpeg",
+  "/cartas/perro.jpeg",
+  "/cartas/pollito.jpeg",
+  "/cartas/serpiente.jpeg",
+];
+
+const numeros = [
+  "/cartas/uno.jpeg",
+  "/cartas/dos.jpeg",
+  "/cartas/tres.jpeg",
+  "/cartas/cuatro.jpeg",
+  "/cartas/cinco.jpeg",
+  "/cartas/seis.jpeg",
+  "/cartas/siete.jpeg",
+  "/cartas/ocho.jpeg",
+  "/cartas/nueve.jpeg",
+  "/cartas/diez.jpeg",
+  "/cartas/once.jpeg",
+  "/cartas/doce.jpeg",
+  "/cartas/trece.jpeg",
+  "/cartas/catorce.jpeg",
+  "/cartas/quince.jpeg",
+  "/cartas/dieciseis.jpeg",
+];
+const colores = [
+  "/cartas/amarrillo.jpeg",
+  "/cartas/anaranjado.jpeg",
+  "/cartas/azul oscuro.jpeg",
+  "/cartas/blanco.jpeg",
+  "/cartas/bordo.jpeg",
+  "/cartas/celeste.jpeg",
+  "/cartas/fuscia.jpeg",
+  "/cartas/gris.jpeg",
+  "/cartas/marron.jpeg",
+  "/cartas/negro.jpeg",
+  "/cartas/oliva.jpeg",
+  "/cartas/rojo.jpeg",
+  "/cartas/rosa.jpeg",
+  "/cartas/turquesa.jpeg",
+  "/cartas/verde claro.jpeg",
+  "/cartas/verde oscuro.jpeg",
+];
 
 export default function JuegoPage() {
   const router = useRouter();
@@ -71,22 +130,15 @@ export default function JuegoPage() {
   const generarCartas = (tipo: string, dificultad: string): Carta[] => {
     let valores: string[] = [];
 
-    if (tipo === "animales") {
-      valores = [
-        "🐶", "🐱", "🐸", "🐵", "🦊", "🐼", "🐰", "🦁",
-        "🐻", "🐯", "🦉", "🦋", "🐢", "🐙", "🦄", "🐷",
-      ];
-    } else if (tipo === "numeros") {
-      valores = [
-        "1", "2", "3", "4", "5", "6", "7", "8",
-        "9", "10", "11", "12", "13", "14", "15", "16",
-      ];
-    } else {
-      valores = [
-        "🔴", "🔵", "🟢", "🟡", "🟣", "🟠", "⚫", "⚪",
-        "🟤", "🔺", "🔷", "🔶", "💚", "💙", "💜", "🩷",
-      ];
-    }
+
+
+if (tipo === "animales") {
+  valores = animales;
+} else if (tipo === "numeros") {
+  valores = numeros;
+} else if (tipo === "colores") {
+  valores = colores;
+}
 
     const cantidadPares = obtenerCantidadPares(dificultad);
     const seleccionados = valores.slice(0, cantidadPares);
@@ -169,59 +221,6 @@ export default function JuegoPage() {
     if (porcentaje >= 80) return "¡¡¡MUY BUENA MEMORIA!!!";
     if (porcentaje >= 60) return "¡¡¡BUENA MEMORIA!!! ¡¡¡Puedes mejorar!!!";
     return "¡¡¡Mala memoria, debes practicar más!!!";
-  };
-
-  const guardarEnBase = async (
-    motivo: MotivoFin,
-    ganadorUsuarioId: string | null,
-    puntosFinalesJugador1: number,
-    puntosFinalesJugador2: number,
-    tiempoJugado: number
-  ) => {
-    if (!jugador1 || !jugador2) return;
-
-    const { data: partidaData, error: partidaError } = await supabase
-      .from("partidas")
-      .insert([
-        {
-          motivo_fin: motivo,
-          tiempo_jugado: tiempoJugado,
-          tiempo_configurado: configuracion?.tiempo,
-          ganador_usuario_id: ganadorUsuarioId,
-        },
-      ])
-      .select()
-      .single();
-
-    if (partidaError || !partidaData) {
-      console.error("Error guardando partida:", partidaError);
-      return;
-    }
-
-    const { error: participacionError } = await supabase
-      .from("participaciones")
-      .insert([
-        {
-          partida_id: partidaData.id,
-          usuario_id: jugador1.id,
-          aciertos: aciertosJugador1,
-          intentos: intentosJugador1,
-          puntos_obtenidos: puntosFinalesJugador1,
-          abandono: motivo === "abandono" && turnoActual === "Jugador 1",
-        },
-        {
-          partida_id: partidaData.id,
-          usuario_id: jugador2.id,
-          aciertos: aciertosJugador2,
-          intentos: intentosJugador2,
-          puntos_obtenidos: puntosFinalesJugador2,
-          abandono: motivo === "abandono" && turnoActual === "Jugador 2",
-        },
-      ]);
-
-    if (participacionError) {
-      console.error("Error guardando participaciones:", participacionError);
-    }
   };
 
   const finalizarPartida = async (motivo: MotivoFin) => {
@@ -311,25 +310,23 @@ export default function JuegoPage() {
       }
     }
 
-   if (motivo === "abandono") {
-  let nombreAbandono = "";
+    if (motivo === "abandono") {
+      let nombreAbandono = "";
 
-  if (turnoActual === "Jugador 1") {
-    nombreAbandono = jugador1?.nombre_usuario ?? "Jugador 1";
+      if (turnoActual === "Jugador 1") {
+        nombreAbandono = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganador = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganadorUsuarioId = jugador2?.id ?? null;
+        puntosFinalesJugador2 = 3;
+      } else {
+        nombreAbandono = jugador2?.nombre_usuario ?? "Jugador 2";
+        ganador = jugador1?.nombre_usuario ?? "Jugador 1";
+        ganadorUsuarioId = jugador1?.id ?? null;
+        puntosFinalesJugador1 = 3;
+      }
 
-    ganador = jugador2?.nombre_usuario ?? "Jugador 2";
-    ganadorUsuarioId = jugador2?.id ?? null;
-    puntosFinalesJugador2 = 3;
-  } else {
-    nombreAbandono = jugador2?.nombre_usuario ?? "Jugador 2";
-
-    ganador = jugador1?.nombre_usuario ?? "Jugador 1";
-    ganadorUsuarioId = jugador1?.id ?? null;
-    puntosFinalesJugador1 = 3;
-  }
-
-  mensaje = `${nombreAbandono} abandonó la partida. ${ganador} gana automáticamente.`;
-}
+      mensaje = `${nombreAbandono} abandonó la partida. ${ganador} gana automáticamente.`;
+    }
 
     if (motivo === "tiempo_agotado") {
       ganador = "Sin ganador";
@@ -349,13 +346,39 @@ export default function JuegoPage() {
         ? 0
         : tiempoConfiguradoEnSegundos - tiempoRestante;
 
-    await guardarEnBase(
-      motivo,
-      ganadorUsuarioId,
-      puntosFinalesJugador1,
-      puntosFinalesJugador2,
-      tiempoJugado
-    );
+    if (jugador1 && jugador2) {
+      try {
+        await guardarPartidaCompleta({
+          motivo,
+          tiempoJugado,
+          tiempoConfigurado: configuracion?.tiempo ?? null,
+          ganadorUsuarioId,
+          jugador1: {
+            id: jugador1.id,
+            aciertos: aciertosJugador1,
+            intentos: intentosJugador1,
+            puntosObtenidos: puntosFinalesJugador1,
+            abandono: motivo === "abandono" && turnoActual === "Jugador 1",
+          },
+          jugador2: {
+            id: jugador2.id,
+            aciertos: aciertosJugador2,
+            intentos: intentosJugador2,
+            puntosObtenidos: puntosFinalesJugador2,
+            abandono: motivo === "abandono" && turnoActual === "Jugador 2",
+          },
+        });
+      } catch (error: any) {
+  console.error("Error guardando partida completa:", error);
+  console.error("Mensaje:", error?.message);
+  console.error("Detalles:", error?.details);
+  console.error("Hint:", error?.hint);
+  console.error("Code:", error?.code);
+  alert(
+    `Error al guardar partida:\n${error?.message ?? "Sin mensaje"}\n${error?.details ?? ""}`
+  );
+}
+    }
 
     const dado1 = localStorage.getItem("dadoJugador1");
     const dado2 = localStorage.getItem("dadoJugador2");
@@ -553,13 +576,25 @@ export default function JuegoPage() {
           style={{ gridTemplateColumns: `repeat(${columnasTablero}, minmax(0, 1fr))` }}
         >
           {cartas.map((carta) => (
-            <button
-              key={carta.id}
-              onClick={() => seleccionarCarta(carta.id)}
-              className={`memory-card ${carta.acertada ? "success" : ""}`}
-            >
-              {carta.descubierta || carta.acertada ? carta.valor : "?"}
-            </button>
+           <button
+  key={carta.id}
+  onClick={() => seleccionarCarta(carta.id)}
+  className={`memory-card ${carta.acertada ? "success" : ""}`}
+>
+  {carta.descubierta || carta.acertada ? (
+    carta.valor.includes("/cartas/") ? (
+      <img
+        src={carta.valor}
+        alt="carta"
+        className="carta-imagen"
+      />
+    ) : (
+      <span className="carta-texto">{carta.valor}</span>
+    )
+  ) : (
+    <span className="carta-texto">?</span>
+  )}
+</button>
           ))}
         </div>
       </div>

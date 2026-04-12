@@ -215,22 +215,6 @@ select {
   font-weight: 700;
 }
 
-@media (max-width: 768px) {
-  .page {
-    padding: 16px;
-  }
-
-  .game-board {
-    gap: 6px;
-    width: min(96vw, 560px);
-  }
-
-  .memory-card {
-    height: clamp(68px, 16vw, 92px);
-    font-size: 1.1rem;
-  }
-}
-
 .form-card {
   background: rgba(19, 26, 42, 0.95);
   border: 1px solid var(--border);
@@ -242,12 +226,12 @@ select {
 }
 
 .form-card-wide {
-  background: rgba(19, 26, 42, 0.95);
+  background: rgba(19, 26, 42, 0.98);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 24px;
   box-shadow: var(--shadow);
-  width: 420px;
+  width: 520px;
   max-width: 100%;
 }
 
@@ -498,17 +482,6 @@ select {
 .login-muted-box {
   color: rgba(255, 255, 255, 0.9);
   max-width: 520px;
-}
-
-@media (max-width: 1000px) {
-  .login-split-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .login-left-panel,
-  .login-right-panel {
-    min-height: auto;
-  }
 }
 
 .summary-layout {
@@ -781,25 +754,10 @@ select {
   font-size: 0.9rem;
 }
 
-@media (max-width: 900px) {
-  .game-top-unificado {
-    grid-template-columns: 1fr;
-  }
-}
 .result-actions {
   display: flex;
-  gap: 24px; /* separación entre botones */
+  gap: 24px;
   margin-top: 24px;
-}
-.registro-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
-}
-
-.registro-card {
-  width: 520px;
-  max-width: 100%;
 }
 
 .registro-header {
@@ -819,8 +777,100 @@ select {
   margin-top: 18px;
 }
 
+/* MODAL REGISTRO */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 10, 24, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 560px;
+  background: rgba(16, 27, 53, 0.98);
+  border: 1px solid rgba(120, 170, 255, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  padding: 28px;
+}
+
+.registro-modal {
+  animation: modalFadeIn 0.18s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 1000px) {
+  .login-split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .login-left-panel,
+  .login-right-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-top-unificado {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
-  .registro-card {
+  .page {
+    padding: 16px;
+  }
+.game-board {
+  gap: 6px;
+  width: min(96vw, 560px);
+}
+
+.memory-card {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e293b;
+}
+
+  .form-card-wide {
     width: 100%;
   }
+
+  .modal-content {
+    padding: 20px;
+  }
+}
+
+.carta-imagen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  padding: 6px;
+}
+.carta-texto {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: white;
 }

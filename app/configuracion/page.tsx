@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+
+import { obtenerRanking } from "@/services/rankingService";
+import { obtenerPartidasUsuario } from "@/services/partidaService";
+
 
 type Jugador = {
   id: string;
@@ -16,32 +19,19 @@ type ConfiguracionPartida = {
 };
 
 type RankingItem = {
-  usuarioId: string;
-  nombre: string;
-  puntosTotales: number;
+  usuario_id: string;
+  puntos_totales: number;
   posicion: number;
+  nombre_usuario?: string;
 };
 
-type EstadisticasJugador = {
-  ranking: number | string;
-  mejorPuntaje: number;
-  partidasJugadas: number;
-  victorias: number;
-  puntosTotales: number;
-};
-
-type UltimoEnfrentamiento = {
+type PartidaUsuario = {
+  partida_id: string;
   fecha: string;
-  ganador: string;
-  puntosJugador1: number;
-  puntosJugador2: number;
-};
-
-type HistorialEnfrentamiento = {
-  victoriasJugador1: number;
-  victoriasJugador2: number;
-  vecesJugadas: number;
-  ultimoEnfrentamiento: UltimoEnfrentamiento | null;
+  puntos_jugador: number;
+  puntos_rival: number;
+  rival_id: string;
+  rival_nombre: string;
 };
 
 export default function ConfiguracionPage() {
@@ -64,12 +54,9 @@ export default function ConfiguracionPage() {
   const [rankingTop5, setRankingTop5] = useState<RankingItem[]>([]);
   const [cargandoRankingTop5, setCargandoRankingTop5] = useState(true);
 
-  const [estadisticasJugador1, setEstadisticasJugador1] =
-    useState<EstadisticasJugador | null>(null);
-  const [estadisticasJugador2, setEstadisticasJugador2] =
-    useState<EstadisticasJugador | null>(null);
-  const [historial, setHistorial] = useState<HistorialEnfrentamiento | null>(null);
-  const [cargandoStats, setCargandoStats] = useState(true);
+  const [ultimasPartidasJugador1, setUltimasPartidasJugador1] = useState<PartidaUsuario[]>([]);
+  const [ultimasPartidasJugador2, setUltimasPartidasJugador2] = useState<PartidaUsuario[]>([]);
+  const [cargandoUltimasPartidas, setCargandoUltimasPartidas] = useState(true);
 
   useEffect(() => {
     const jugadoresGuardados = localStorage.getItem("jugadoresLogueados");
@@ -99,59 +86,20 @@ export default function ConfiguracionPage() {
     if (!jugador1 || !jugador2) return;
 
     cargarRankingTop5();
-    cargarEstadisticasEHistorial(jugador1, jugador2);
+    cargarUltimasPartidas(jugador1, jugador2);
   }, [jugador1, jugador2]);
 
   const cargarRankingTop5 = async () => {
     try {
       setCargandoRankingTop5(true);
 
-      const { data, error } = await supabase
-        .from("participaciones")
-        .select(`
-          usuario_id,
-          puntos_obtenidos,
-          usuario:usuarios!participaciones_usuario_id_fkey (
-            id,
-            nombre_usuario
-          )
-        `);
+      const data = await obtenerRanking();
 
-      if (error) throw error;
-
-      const acumulado = new Map<string, { nombre: string; puntosTotales: number }>();
-
-      (data || []).forEach((item: any) => {
-        const usuarioId = item.usuario_id;
-        const nombre = item.usuario?.nombre_usuario ?? "Sin nombre";
-        const puntos = Number(item.puntos_obtenidos ?? 0);
-
-        if (!acumulado.has(usuarioId)) {
-          acumulado.set(usuarioId, {
-            nombre,
-            puntosTotales: puntos,
-          });
-        } else {
-          const actual = acumulado.get(usuarioId)!;
-          actual.puntosTotales += puntos;
-        }
-      });
-
-      const ranking = Array.from(acumulado.entries())
-        .map(([usuarioId, valor]) => ({
-          usuarioId,
-          nombre: valor.nombre,
-          puntosTotales: valor.puntosTotales,
-          posicion: 0,
-        }))
-        .sort((a, b) => b.puntosTotales - a.puntosTotales)
-        .slice(0, 5)
-        .map((item, index) => ({
-          ...item,
-          posicion: index + 1,
-        }));
-
-      setRankingTop5(ranking);
+      if (Array.isArray(data)) {
+        setRankingTop5(data as RankingItem[]);
+      } else {
+        setRankingTop5([]);
+      }
     } catch (error) {
       console.error("Error al cargar ranking top 5:", error);
       setRankingTop5([]);
@@ -160,167 +108,27 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const obtenerEstadisticasJugador = async (
-    jugador: Jugador
-  ): Promise<EstadisticasJugador> => {
-    const { data: participaciones, error: participacionesError } = await supabase
-      .from("participaciones")
-      .select("puntos_obtenidos, usuario_id")
-      .eq("usuario_id", jugador.id);
+ const cargarUltimasPartidas = async (j1: Jugador, j2: Jugador) => {
+  try {
+    setCargandoUltimasPartidas(true);
 
-    if (participacionesError) throw participacionesError;
+    const [partidasJ1, partidasJ2] = await Promise.all([
+      obtenerPartidasUsuario(j1.id, 5),
+      obtenerPartidasUsuario(j2.id, 5),
+    ]);
 
-    const listaParticipaciones = participaciones || [];
+    setUltimasPartidasJugador1(Array.isArray(partidasJ1) ? partidasJ1 : []);
+    setUltimasPartidasJugador2(Array.isArray(partidasJ2) ? partidasJ2 : []);
+  } catch (error) {
+    console.error("Error al cargar últimas partidas:", error);
+    setUltimasPartidasJugador1([]);
+    setUltimasPartidasJugador2([]);
+  } finally {
+    setCargandoUltimasPartidas(false);
+  }
+};
 
-    const partidasJugadas = listaParticipaciones.length;
-    const mejorPuntaje = listaParticipaciones.reduce(
-      (max, item: any) => Math.max(max, Number(item.puntos_obtenidos ?? 0)),
-      0
-    );
-    const puntosTotales = listaParticipaciones.reduce(
-      (sum, item: any) => sum + Number(item.puntos_obtenidos ?? 0),
-      0
-    );
 
-    const { count: victorias, error: victoriasError } = await supabase
-      .from("partidas")
-      .select("*", { count: "exact", head: true })
-      .eq("ganador_usuario_id", jugador.id);
-
-    if (victoriasError) throw victoriasError;
-
-    const { data: rankingData, error: rankingError } = await supabase
-      .from("participaciones")
-      .select("usuario_id, puntos_obtenidos");
-
-    if (rankingError) throw rankingError;
-
-    const mapaRanking = new Map<string, number>();
-
-    (rankingData || []).forEach((item: any) => {
-      const id = item.usuario_id;
-      const puntos = Number(item.puntos_obtenidos ?? 0);
-      mapaRanking.set(id, (mapaRanking.get(id) ?? 0) + puntos);
-    });
-
-    const rankingOrdenado = Array.from(mapaRanking.entries()).sort(
-      (a, b) => b[1] - a[1]
-    );
-
-    const indiceRanking = rankingOrdenado.findIndex(([id]) => id === jugador.id);
-
-    return {
-      ranking: indiceRanking >= 0 ? indiceRanking + 1 : "-",
-      mejorPuntaje,
-      partidasJugadas,
-      victorias: victorias ?? 0,
-      puntosTotales,
-    };
-  };
-
-  const cargarEstadisticasEHistorial = async (
-    j1: Jugador,
-    j2: Jugador
-  ) => {
-    try {
-      setCargandoStats(true);
-
-      const [stats1, stats2] = await Promise.all([
-        obtenerEstadisticasJugador(j1),
-        obtenerEstadisticasJugador(j2),
-      ]);
-
-      setEstadisticasJugador1(stats1);
-      setEstadisticasJugador2(stats2);
-
-      const { data: partidas, error } = await supabase
-        .from("partidas")
-        .select(`
-          id,
-          fecha,
-          ganador_usuario_id,
-          participaciones (
-            usuario_id,
-            puntos_obtenidos
-          )
-        `)
-        .order("fecha", { ascending: false });
-
-      if (error) throw error;
-
-      const partidasEntreAmbos = (partidas || []).filter((partida: any) => {
-        const ids = (partida.participaciones || []).map((p: any) => p.usuario_id);
-        return ids.includes(j1.id) && ids.includes(j2.id);
-      });
-
-      const victoriasJugador1 = partidasEntreAmbos.filter(
-        (partida: any) => partida.ganador_usuario_id === j1.id
-      ).length;
-
-      const victoriasJugador2 = partidasEntreAmbos.filter(
-        (partida: any) => partida.ganador_usuario_id === j2.id
-      ).length;
-
-      let ultimoEnfrentamiento: UltimoEnfrentamiento | null = null;
-
-      if (partidasEntreAmbos.length > 0) {
-        const ultima = partidasEntreAmbos[0];
-
-        const participacionJ1 = (ultima.participaciones || []).find(
-          (p: any) => p.usuario_id === j1.id
-        );
-        const participacionJ2 = (ultima.participaciones || []).find(
-          (p: any) => p.usuario_id === j2.id
-        );
-
-        ultimoEnfrentamiento = {
-          fecha: ultima.fecha,
-          ganador:
-            ultima.ganador_usuario_id === j1.id
-              ? j1.nombre_usuario
-              : ultima.ganador_usuario_id === j2.id
-              ? j2.nombre_usuario
-              : "-",
-          puntosJugador1: Number(participacionJ1?.puntos_obtenidos ?? 0),
-          puntosJugador2: Number(participacionJ2?.puntos_obtenidos ?? 0),
-        };
-      }
-
-      setHistorial({
-        victoriasJugador1,
-        victoriasJugador2,
-        vecesJugadas: partidasEntreAmbos.length,
-        ultimoEnfrentamiento,
-      });
-    } catch (error) {
-      console.error("Error al cargar estadísticas e historial:", error);
-
-      setEstadisticasJugador1({
-        ranking: "-",
-        mejorPuntaje: 0,
-        partidasJugadas: 0,
-        victorias: 0,
-        puntosTotales: 0,
-      });
-
-      setEstadisticasJugador2({
-        ranking: "-",
-        mejorPuntaje: 0,
-        partidasJugadas: 0,
-        victorias: 0,
-        puntosTotales: 0,
-      });
-
-      setHistorial({
-        victoriasJugador1: 0,
-        victoriasJugador2: 0,
-        vecesJugadas: 0,
-        ultimoEnfrentamiento: null,
-      });
-    } finally {
-      setCargandoStats(false);
-    }
-  };
 
   const lanzarDados = () => {
     if (sorteando) return;
@@ -389,11 +197,10 @@ export default function ConfiguracionPage() {
 
     router.push("/juego");
   };
-
-  const formatearFecha = (fechaIso: string) => {
-    const fecha = new Date(fechaIso);
-    return fecha.toLocaleString("es-AR");
-  };
+const formatearPartidaCorta = (partida: PartidaUsuario) => {
+  const fecha = new Date(partida.fecha).toLocaleDateString("es-AR");
+  return `${fecha} vs ${partida.rival_nombre} ${partida.puntos_jugador}-${partida.puntos_rival} pts`;
+};
 
   return (
     <main className="page">
@@ -412,7 +219,7 @@ export default function ConfiguracionPage() {
               </div>
 
               <div className="top5-ranking-box">
-                <h3 className="top5-title">Top 5 Ranking</h3>
+                <h3 className="top5-title">  TOP 5   </h3>
 
                 <div className="top5-list">
                   {cargandoRankingTop5 ? (
@@ -432,14 +239,14 @@ export default function ConfiguracionPage() {
 
                       return (
                         <div
-                          key={item.usuarioId}
+                          key={item.usuario_id}
                           className={`top5-item ${index === 0 ? "top1" : ""}`}
                         >
                           <strong>
-                            {medalla} - {item.nombre}
+                            {medalla} - {item.nombre_usuario ?? item.usuario_id}
                           </strong>
                           <br />
-                          Puntos: {item.puntosTotales}
+                          Puntos: {item.puntos_totales}
                         </div>
                       );
                     })
@@ -449,69 +256,43 @@ export default function ConfiguracionPage() {
             </div>
 
             <div className="match-facts-panel">
-              <h2 className="match-title">Estadísticas</h2>
+              <h2 className="match-title">Las ultimas 5 🔥🔥</h2>
 
-              {cargandoStats ? (
-                <p className="summary-text center-box">Cargando estadísticas...</p>
+              {cargandoUltimasPartidas ? (
+                <p className="summary-text center-box">Cargando partidas...</p>
               ) : (
                 <>
                   <div className="match-table">
-                    <div>{estadisticasJugador1?.ranking ?? "-"}</div>
-                    <div>Ranking</div>
-                    <div>{estadisticasJugador2?.ranking ?? "-"}</div>
-
-                    <div>{jugador1.nombre_usuario}</div>
-                    <div>Jugador</div>
-                    <div>{jugador2.nombre_usuario}</div>
-
-                    <div>{estadisticasJugador1?.mejorPuntaje ?? 0}</div>
-                    <div>Mejor puntaje</div>
-                    <div>{estadisticasJugador2?.mejorPuntaje ?? 0}</div>
-
-                    <div>{estadisticasJugador1?.partidasJugadas ?? 0}</div>
-                    <div>Partidas jugadas</div>
-                    <div>{estadisticasJugador2?.partidasJugadas ?? 0}</div>
-
-                    <div>{estadisticasJugador1?.victorias ?? 0}</div>
-                    <div>Victorias</div>
-                    <div>{estadisticasJugador2?.victorias ?? 0}</div>
-
-                    <div>{estadisticasJugador1?.puntosTotales ?? 0}</div>
-                    <div>Puntos totales</div>
-                    <div>{estadisticasJugador2?.puntosTotales ?? 0}</div>
-
-                    <div>{historial?.victoriasJugador1 ?? 0}</div>
-                    <div>Victorias entre ambos</div>
-                    <div>{historial?.victoriasJugador2 ?? 0}</div>
-
                     <div>
-                      {historial?.ultimoEnfrentamiento
-                        ? historial.ultimoEnfrentamiento.puntosJugador1
-                        : 0}
+                      <strong>{jugador1.nombre_usuario}</strong>
                     </div>
-                    <div>Último puntaje</div>
+                    <div>Partida</div>
                     <div>
-                      {historial?.ultimoEnfrentamiento
-                        ? historial.ultimoEnfrentamiento.puntosJugador2
-                        : 0}
+                      <strong>{jugador2.nombre_usuario}</strong>
                     </div>
+
+                    {Array.from({ length: 5 }).map((_, index) => {
+  const partidaJ1 = ultimasPartidasJugador1[index];
+  const partidaJ2 = ultimasPartidasJugador2[index];
+
+  return (
+    <React.Fragment key={index}>
+      <div>
+        {partidaJ1 ? formatearPartidaCorta(partidaJ1) : "-"}
+      </div>
+
+      <div>#{index + 1}</div>
+
+      <div>
+        {partidaJ2 ? formatearPartidaCorta(partidaJ2) : "-"}
+      </div>
+    </React.Fragment>
+  );
+})}
                   </div>
 
-                  <div className="match-extra">
-                    <p>
-                      Último ganador:{" "}
-                      {historial?.ultimoEnfrentamiento?.ganador ?? "-"}
-                    </p>
-
-                    <p>Veces que jugaron: {historial?.vecesJugadas ?? 0}</p>
-
-                    <p>
-                      Última partida:{" "}
-                      {historial?.ultimoEnfrentamiento
-                        ? formatearFecha(historial.ultimoEnfrentamiento.fecha)
-                        : "Sin enfrentamientos"}
-                    </p>
-                  </div>
+                          <p></p>
+                          <p></p>
                 </>
               )}
             </div>
@@ -540,8 +321,6 @@ export default function ConfiguracionPage() {
           >
             {sorteando ? "Sorteando..." : "Lanzar dados"}
           </button>
-
-
 
           {sorteoRealizado && turnoInicial && (
             <p className="start-text">

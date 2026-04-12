@@ -2,26 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-type ResultadoPartida = {
-  motivo: "completado" | "max_intentos" | "abandono" | "tiempo_agotado";
-  ganador: string;
-  mensaje: string;
-  jugador1Nombre: string;
-  jugador2Nombre: string;
-  aciertosJugador1: number;
-  aciertosJugador2: number;
-  intentosJugador1: number;
-  intentosJugador2: number;
-  puntosFinalesJugador1: number;
-  puntosFinalesJugador2: number;
-  tiempoJugado: number;
-  tiempoConfigurado: number | null;
-  dadoJugador1: number | null;
-  dadoJugador2: number | null;
-  ganadorSorteo: "Jugador 1" | "Jugador 2" | null;
-  numeroPartida: number;
-};
+import type { ResultadoPartida } from "@/types/juego";
+import { formatearTiempo } from "@/utils/formatters";
 
 export default function ResultadoPage() {
   const router = useRouter();
@@ -40,15 +22,6 @@ export default function ResultadoPage() {
 
   const volverAInicio = () => {
     router.push("/");
-  };
-
-  const formatearTiempo = (segundos: number) => {
-    const minutos = Math.floor(segundos / 60);
-    const segundosRestantes = segundos % 60;
-
-    return `${String(minutos).padStart(2, "0")}:${String(
-      segundosRestantes
-    ).padStart(2, "0")}`;
   };
 
   const valorGanadorJugador1 =
@@ -76,8 +49,6 @@ export default function ResultadoPage() {
   return (
     <main className="page">
       <div className="container">
-
-
         <div className="panel result-panel-compact">
           <h2 className="match-title">Resultado de la partida</h2>
 
@@ -125,10 +96,6 @@ export default function ResultadoPage() {
               <strong>Tiempo jugado:</strong>{" "}
               {formatearTiempo(resultado.tiempoJugado)}
             </p>
-
-
-
-
           </div>
 
           <div className="result-actions">

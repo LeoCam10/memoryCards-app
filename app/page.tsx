@@ -1,358 +1,347 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import {
+  registrarUsuario,
+  loginUsuario,
+  obtenerPerfilUsuario,
+  cerrarSesionUsuario,
+  obtenerPaises,
+  type Pais,
+} from "@/services/authService";
+import {
+  obtenerPartidasUsuario,
+  obtenerPartidasEnComun,
+} from "@/services/partidaService";
 
-type Usuario = {
+type JugadorPerfil = {
   id: string;
+  email: string;
   nombre_usuario: string;
-  contrasena: string;
   pais: string;
   mayor_12: boolean;
 };
 
-type MensajeBienvenida =
-  | {
-      tipo: "conjunto";
-      mensajeGeneral: string;
-    }
-  | {
-      tipo: "individual";
-      jugador1: string;
-      jugador2: string;
-    }
-  | {
-      tipo: "nuevo";
-      mensajeGeneral: string;
-    };
+type EstadoLogin = {
+  email: string;
+  password: string;
+  cargando: boolean;
+  error: string;
+  jugador: JugadorPerfil | null;
+};
+
+type PartidaUsuario = {
+  partida_id: string;
+  fecha: string;
+  puntos_obtenidos: number;
+  rival_id: string;
+  rival_nombre: string;
+};
+
+type PartidaEnComun = {
+  partida_id: string;
+  fecha: string;
+  jugador1_nombre: string;
+  jugador2_nombre: string;
+  puntos_jugador1: number;
+  puntos_jugador2: number;
+};
 
 export default function HomePage() {
   const router = useRouter();
 
-  const [usuario1, setUsuario1] = useState("");
-  const [password1, setPassword1] = useState("");
-  const [usuario2, setUsuario2] = useState("");
-  const [password2, setPassword2] = useState("");
+  const [jugador1, setJugador1] = useState<EstadoLogin>({
+    email: "",
+    password: "",
+    cargando: false,
+    error: "",
+    jugador: null,
+  });
 
-  const [jugador1, setJugador1] = useState<Usuario | null>(null);
-  const [jugador2, setJugador2] = useState<Usuario | null>(null);
+  const [jugador2, setJugador2] = useState<EstadoLogin>({
+    email: "",
+    password: "",
+    cargando: false,
+    error: "",
+    jugador: null,
+  });
 
-  const [error1, setError1] = useState("");
-  const [error2, setError2] = useState("");
+  const [mostrarRegistro, setMostrarRegistro] = useState(false);
 
-  const [mensajeBienvenida, setMensajeBienvenida] =
-    useState<MensajeBienvenida | null>(null);
+  const [registroEmail, setRegistroEmail] = useState("");
+  const [registroPassword, setRegistroPassword] = useState("");
+  const [registroNombreUsuario, setRegistroNombreUsuario] = useState("");
+  const [registroPais, setRegistroPais] = useState("");
+  const [registroMayor12, setRegistroMayor12] = useState(false);
+  const [registroError, setRegistroError] = useState("");
+  const [registroMensaje, setRegistroMensaje] = useState("");
+
+  const [mensajeGeneral, setMensajeGeneral] = useState("");
+  const [mensajeJugador1, setMensajeJugador1] = useState("");
+  const [mensajeJugador2, setMensajeJugador2] = useState("");
+
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [mostrarDropdownPaises, setMostrarDropdownPaises] = useState(false);
 
   useEffect(() => {
-    const jugador1Guardado = localStorage.getItem("jugador1Logueado");
-    const jugador2Guardado = localStorage.getItem("jugador2Logueado");
+    const jugadoresGuardados = localStorage.getItem("jugadoresLogueados");
 
-    if (jugador1Guardado) {
-      setJugador1(JSON.parse(jugador1Guardado));
-    }
+    if (jugadoresGuardados) {
+      try {
+        const parsed = JSON.parse(jugadoresGuardados);
 
-    if (jugador2Guardado) {
-      setJugador2(JSON.parse(jugador2Guardado));
+        setJugador1((prev) => ({
+          ...prev,
+          jugador: parsed.jugador1 ?? null,
+        }));
+
+        setJugador2((prev) => ({
+          ...prev,
+          jugador: parsed.jugador2 ?? null,
+        }));
+      } catch (error) {
+        console.error("Error al leer jugadores del localStorage:", error);
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (jugador1) {
-      localStorage.setItem("jugador1Logueado", JSON.stringify(jugador1));
-    } else {
-      localStorage.removeItem("jugador1Logueado");
-    }
+    if (!mostrarRegistro) return;
 
-    if (jugador2) {
-      localStorage.setItem("jugador2Logueado", JSON.stringify(jugador2));
-    } else {
-      localStorage.removeItem("jugador2Logueado");
-    }
-
-    if (jugador1 && jugador2) {
-      localStorage.setItem(
-        "jugadoresLogueados",
-        JSON.stringify({
-          jugador1,
-          jugador2,
-        })
-      );
-    } else {
-      localStorage.removeItem("jugadoresLogueados");
-    }
-  }, [jugador1, jugador2]);
-
-  const formatearFecha = (fechaIso: string) => {
-    const fecha = new Date(fechaIso);
-    return fecha.toLocaleString("es-AR");
-  };
-
-  const iniciarSesion = async (
-    usuario: string,
-    contrasena: string,
-    numeroJugador: 1 | 2
-  ) => {
-    if (!usuario || !contrasena) {
-      if (numeroJugador === 1) {
-        setError1("Completá usuario y contraseña.");
-      } else {
-        setError2("Completá usuario y contraseña.");
+    const cargarPaises = async () => {
+      try {
+        const data = await obtenerPaises();
+        setPaises(data);
+      } catch (error) {
+        console.error("Error al cargar países:", error);
       }
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select("*")
-      .eq("nombre_usuario", usuario)
-      .eq("contrasena", contrasena)
-      .single();
-
-    if (error || !data) {
-      if (numeroJugador === 1) {
-        setError1("Usuario o contraseña incorrectos.");
-      } else {
-        setError2("Usuario o contraseña incorrectos.");
-      }
-      return;
-    }
-
-    if (numeroJugador === 1) {
-      if (jugador2 && jugador2.id === data.id) {
-        setError1("No puede iniciar sesión el mismo usuario en ambos jugadores.");
-        return;
-      }
-
-      setJugador1(data);
-      setError1("");
-      setMensajeBienvenida(null);
-      setUsuario1("");
-      setPassword1("");
-    } else {
-      if (jugador1 && jugador1.id === data.id) {
-        setError2("No puede iniciar sesión el mismo usuario en ambos jugadores.");
-        return;
-      }
-
-      setJugador2(data);
-      setError2("");
-      setMensajeBienvenida(null);
-      setUsuario2("");
-      setPassword2("");
-    }
-  };
-
-  const cerrarSesionJugador = (numeroJugador: 1 | 2) => {
-    if (numeroJugador === 1) {
-      setJugador1(null);
-      setUsuario1("");
-      setPassword1("");
-      setError1("");
-      localStorage.removeItem("jugador1Logueado");
-    } else {
-      setJugador2(null);
-      setUsuario2("");
-      setPassword2("");
-      setError2("");
-      localStorage.removeItem("jugador2Logueado");
-    }
-
-    setMensajeBienvenida(null);
-  };
-
-  const buscarUltimaPartidaDeUsuario = async (usuarioId: string) => {
-    const { data, error } = await supabase
-      .from("participaciones")
-      .select(
-        `
-        partida_id,
-        puntos_obtenidos,
-        created_at,
-        partidas (
-          id,
-          fecha
-        )
-      `
-      )
-      .eq("usuario_id", usuarioId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (error || !data || data.length === 0) {
-      return null;
-    }
-
-    return data[0];
-  };
-
-  const buscarRivalDePartida = async (
-    partidaId: string,
-    usuarioId: string
-  ) => {
-    const { data, error } = await supabase
-      .from("participaciones")
-      .select(
-        `
-        usuario_id,
-        usuarios (
-          id,
-          nombre_usuario
-        )
-      `
-      )
-      .eq("partida_id", partidaId);
-
-    if (error || !data) {
-      return null;
-    }
-
-    const rival = (data as any[]).find((p) => p.usuario_id !== usuarioId);
-    return rival?.usuarios ?? null;
-  };
-
-  const buscarUltimoEnfrentamiento = async (
-    usuarioId1: string,
-    usuarioId2: string
-  ) => {
-    const { data, error } = await supabase
-      .from("participaciones")
-      .select(
-        `
-        partida_id,
-        usuario_id,
-        puntos_obtenidos,
-        created_at,
-        partidas (
-          id,
-          fecha
-        )
-      `
-      )
-      .in("usuario_id", [usuarioId1, usuarioId2])
-      .order("created_at", { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      return null;
-    }
-
-    const agrupadas: Record<string, any[]> = {};
-
-    for (const fila of data as any[]) {
-      if (!agrupadas[fila.partida_id]) {
-        agrupadas[fila.partida_id] = [];
-      }
-      agrupadas[fila.partida_id].push(fila);
-    }
-
-    for (const partidaId of Object.keys(agrupadas)) {
-      const grupo = agrupadas[partidaId];
-
-      const tieneUsuario1 = grupo.some((g) => g.usuario_id === usuarioId1);
-      const tieneUsuario2 = grupo.some((g) => g.usuario_id === usuarioId2);
-
-      if (tieneUsuario1 && tieneUsuario2) {
-        const fila1 = grupo.find((g) => g.usuario_id === usuarioId1);
-        const fila2 = grupo.find((g) => g.usuario_id === usuarioId2);
-
-        return {
-          fecha: fila1?.partidas?.fecha,
-          puntosJugador1: fila1?.puntos_obtenidos ?? 0,
-          puntosJugador2: fila2?.puntos_obtenidos ?? 0,
-        };
-      }
-    }
-
-    return null;
-  };
-
-  const construirMensajesBienvenida = async (
-    j1: Usuario,
-    j2: Usuario
-  ): Promise<MensajeBienvenida> => {
-    const ultimoEnfrentamiento = await buscarUltimoEnfrentamiento(j1.id, j2.id);
-
-    if (ultimoEnfrentamiento) {
-      return {
-        tipo: "conjunto",
-        mensajeGeneral: `Última vez que jugaron juntos: ${formatearFecha(
-          ultimoEnfrentamiento.fecha
-        )}. ${j1.nombre_usuario} obtuvo ${
-          ultimoEnfrentamiento.puntosJugador1
-        } puntos y ${j2.nombre_usuario} obtuvo ${
-          ultimoEnfrentamiento.puntosJugador2
-        } puntos.`,
-      };
-    }
-
-    const ultimaJugadaJ1 = await buscarUltimaPartidaDeUsuario(j1.id);
-    const ultimaJugadaJ2 = await buscarUltimaPartidaDeUsuario(j2.id);
-
-    if (!ultimaJugadaJ1 && !ultimaJugadaJ2) {
-      return {
-        tipo: "nuevo",
-        mensajeGeneral: "Hola!! Divertite y jugá!!",
-      };
-    }
-
-    let mensajeJ1 = "Hola!! Divertite y jugá!!";
-    let mensajeJ2 = "Hola!! Divertite y jugá!!";
-
-    if (ultimaJugadaJ1) {
-      const partidaInfo: any = ultimaJugadaJ1.partidas;
-      const rival = await buscarRivalDePartida(ultimaJugadaJ1.partida_id, j1.id);
-
-      mensajeJ1 = `Es la primera vez que jugás con ${j2.nombre_usuario}. Tu última partida fue el ${formatearFecha(
-        partidaInfo.fecha
-      )} contra ${rival?.nombre_usuario ?? "otro usuario"}.`;
-    }
-
-    if (ultimaJugadaJ2) {
-      const partidaInfo: any = ultimaJugadaJ2.partidas;
-      const rival = await buscarRivalDePartida(ultimaJugadaJ2.partida_id, j2.id);
-
-      mensajeJ2 = `Es la primera vez que jugás con ${j1.nombre_usuario}. Tu última partida fue el ${formatearFecha(
-        partidaInfo.fecha
-      )} contra ${rival?.nombre_usuario ?? "otro usuario"}.`;
-    }
-
-    return {
-      tipo: "individual",
-      jugador1: mensajeJ1,
-      jugador2: mensajeJ2,
     };
-  };
+
+    cargarPaises();
+  }, [mostrarRegistro]);
 
   useEffect(() => {
-    const consultarBienvenida = async () => {
-      if (!jugador1 || !jugador2) return;
+    const cargarMensajeBienvenida = async () => {
+      if (!jugador1.jugador || !jugador2.jugador) {
+        setMensajeGeneral("");
+        setMensajeJugador1("");
+        setMensajeJugador2("");
+        return;
+      }
 
-      const mensajes = await construirMensajesBienvenida(jugador1, jugador2);
-      setMensajeBienvenida(mensajes);
+      const j1 = jugador1.jugador;
+      const j2 = jugador2.jugador;
+
+      try {
+        const [partidasEnComun, historialJ1, historialJ2] = await Promise.all([
+          obtenerPartidasEnComun(j1.id, j2.id, 1),
+          obtenerPartidasUsuario(j1.id, 1),
+          obtenerPartidasUsuario(j2.id, 1),
+        ]);
+
+        const ultimaEnComun = partidasEnComun[0] as PartidaEnComun | undefined;
+        const ultimaJ1 = historialJ1[0] as PartidaUsuario | undefined;
+        const ultimaJ2 = historialJ2[0] as PartidaUsuario | undefined;
+
+        // 1) Jugaron juntos -> mensaje general
+        if (ultimaEnComun) {
+          const fecha = new Date(ultimaEnComun.fecha).toLocaleString("es-AR");
+
+          setMensajeGeneral(
+            `Última vez que jugaron juntos: ${fecha}. ${j1.nombre_usuario} obtuvo ${ultimaEnComun.puntos_jugador1} puntos y ${j2.nombre_usuario} obtuvo ${ultimaEnComun.puntos_jugador2} puntos.`
+          );
+          setMensajeJugador1("");
+          setMensajeJugador2("");
+          return;
+        }
+
+        // 2) Ninguno jugó nunca -> mensaje general
+        if (!ultimaJ1 && !ultimaJ2) {
+          setMensajeGeneral("Hola!! Divertite y jugá!!");
+          setMensajeJugador1("");
+          setMensajeJugador2("");
+          return;
+        }
+
+        // 3) Casos individuales
+        setMensajeGeneral("");
+
+        if (!ultimaJ1) {
+          setMensajeJugador1("Hola!! Divertite y jugá!!");
+        } else {
+          const fechaJ1 = new Date(ultimaJ1.fecha).toLocaleString("es-AR");
+          setMensajeJugador1(
+            `Última vez que jugó: ${fechaJ1} contra ${ultimaJ1.rival_nombre}.`
+          );
+        }
+
+        if (!ultimaJ2) {
+          setMensajeJugador2("Hola!! Divertite y jugá!!");
+        } else {
+          const fechaJ2 = new Date(ultimaJ2.fecha).toLocaleString("es-AR");
+          setMensajeJugador2(
+            `Última vez que jugó: ${fechaJ2} contra ${ultimaJ2.rival_nombre}.`
+          );
+        }
+      } catch (error) {
+        console.error("Error al cargar mensajes:", error);
+        setMensajeGeneral("Hola!! Divertite y jugá!!");
+        setMensajeJugador1("");
+        setMensajeJugador2("");
+      }
     };
 
-    if (jugador1 && jugador2) {
-      consultarBienvenida();
+    cargarMensajeBienvenida();
+  }, [jugador1.jugador, jugador2.jugador]);
+
+  const paisesFiltrados = useMemo(() => {
+    const texto = registroPais.trim().toLowerCase();
+
+    if (!texto) return paises.slice(0, 8);
+
+    return paises
+      .filter((pais) => pais.nombre.toLowerCase().includes(texto))
+      .slice(0, 8);
+  }, [registroPais, paises]);
+
+  const iniciarSesion = async (numero: 1 | 2) => {
+    const estado = numero === 1 ? jugador1 : jugador2;
+    const setEstado = numero === 1 ? setJugador1 : setJugador2;
+
+    try {
+      setEstado((prev) => ({
+        ...prev,
+        cargando: true,
+        error: "",
+      }));
+
+      if (!estado.email || !estado.password) {
+        setEstado((prev) => ({
+          ...prev,
+          cargando: false,
+          error: "Ingresá email y contraseña.",
+        }));
+        return;
+      }
+
+      const user = await loginUsuario(estado.email, estado.password);
+      const perfil = await obtenerPerfilUsuario(user.id);
+
+      const otroJugador = numero === 1 ? jugador2.jugador : jugador1.jugador;
+
+      if (otroJugador && otroJugador.id === perfil.id) {
+        setEstado((prev) => ({
+          ...prev,
+          cargando: false,
+          error: "Ese usuario ya inició sesión como el otro jugador.",
+        }));
+        return;
+      }
+
+      setEstado((prev) => ({
+        ...prev,
+        cargando: false,
+        jugador: perfil,
+        password: "",
+        error: "",
+      }));
+    } catch (error: any) {
+      setEstado((prev) => ({
+        ...prev,
+        cargando: false,
+        error: error.message ?? "Error al iniciar sesión.",
+      }));
     }
-  }, [jugador1, jugador2]);
+  };
+
+  const cerrarSesionLocal = async (numero: 1 | 2) => {
+    try {
+      await cerrarSesionUsuario();
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+
+    if (numero === 1) {
+      setJugador1({
+        email: "",
+        password: "",
+        cargando: false,
+        error: "",
+        jugador: null,
+      });
+    } else {
+      setJugador2({
+        email: "",
+        password: "",
+        cargando: false,
+        error: "",
+        jugador: null,
+      });
+    }
+
+    localStorage.removeItem("jugadoresLogueados");
+  };
+
+  const handleRegistrar = async () => {
+    try {
+      setRegistroError("");
+      setRegistroMensaje("");
+
+      if (
+        !registroEmail ||
+        !registroPassword ||
+        !registroNombreUsuario ||
+        !registroPais
+      ) {
+        setRegistroError("Completá todos los campos.");
+        return;
+      }
+
+      await registrarUsuario({
+        email: registroEmail,
+        password: registroPassword,
+        nombreUsuario: registroNombreUsuario,
+        pais: registroPais,
+        mayor12: registroMayor12,
+      });
+
+      setRegistroMensaje("Usuario registrado correctamente.");
+
+      setRegistroEmail("");
+      setRegistroPassword("");
+      setRegistroNombreUsuario("");
+      setRegistroPais("");
+      setRegistroMayor12(false);
+      setMostrarDropdownPaises(false);
+
+      setTimeout(() => {
+        setMostrarRegistro(false);
+        setRegistroMensaje("");
+      }, 1200);
+    } catch (error: any) {
+      setRegistroError(error.message ?? "Error al registrar.");
+    }
+  };
 
   const continuar = () => {
-    if (!jugador1 || !jugador2) return;
+    if (!jugador1.jugador || !jugador2.jugador) return;
+
+    if (jugador1.jugador.id === jugador2.jugador.id) {
+      alert("No puede jugar la misma cuenta en ambos jugadores.");
+      return;
+    }
 
     localStorage.setItem(
       "jugadoresLogueados",
       JSON.stringify({
-        jugador1,
-        jugador2,
+        jugador1: jugador1.jugador,
+        jugador2: jugador2.jugador,
       })
     );
 
     router.push("/configuracion");
   };
-
-  const mostrarMensajeGeneral =
-    mensajeBienvenida?.tipo === "conjunto" ||
-    mensajeBienvenida?.tipo === "nuevo";
 
   return (
     <main className="page">
@@ -360,23 +349,24 @@ export default function HomePage() {
         <div className="login-split-layout">
           <section className="login-left-panel">
             <div className="login-left-content">
-
-              <h1 className="login-big-title">MEMORY CARDS</h1>
-
-              <div className="login-muted-box">
-
-              </div>
+              <h1 className="login-big-title">MEMORIA PRO</h1>
 
               <div className="login-info-card">
                 <h3>Información de la sesión</h3>
 
-                {mostrarMensajeGeneral ? (
-                  <p>{mensajeBienvenida.mensajeGeneral}</p>
-                ) : (
-                  <p>
-                    Cuando ambos jugadores inicien sesión, acá vas a ver el
-                    historial compartido o un mensaje de bienvenida.
-                  </p>
+                {mensajeGeneral && <p>{mensajeGeneral}</p>}
+
+                {!mensajeGeneral && (
+                  <>
+                    <p>
+                      <strong>{jugador1.jugador?.nombre_usuario}:</strong>{" "}
+                      {mensajeJugador1}
+                    </p>
+                    <p>
+                      <strong>{jugador2.jugador?.nombre_usuario}:</strong>{" "}
+                      {mensajeJugador2}
+                    </p>
+                  </>
                 )}
               </div>
 
@@ -384,174 +374,168 @@ export default function HomePage() {
                 <h3>Estado actual</h3>
                 <p>
                   <strong>Jugador 1:</strong>{" "}
-                  {jugador1 ? jugador1.nombre_usuario : "sin iniciar sesión"}
+                  {jugador1.jugador
+                    ? jugador1.jugador.nombre_usuario
+                    : "sin iniciar sesión"}
                 </p>
                 <p>
                   <strong>Jugador 2:</strong>{" "}
-                  {jugador2 ? jugador2.nombre_usuario : "sin iniciar sesión"}
+                  {jugador2.jugador
+                    ? jugador2.jugador.nombre_usuario
+                    : "sin iniciar sesión"}
                 </p>
               </div>
             </div>
           </section>
 
           <section className="login-right-panel">
-            <div>
-              <div className="login-right-header">
-                <h2 className="login-right-title">Login de jugadores</h2>
-                <p className="login-right-text">
-                  Cada jugador debe autenticarse con su usuario y contraseña.
-                </p>
+            <div className="login-right-header">
+              <h2 className="login-right-title">Inicio de jugadores</h2>
+              <p className="login-right-text">
+                Cada jugador debe autenticarse con su email y contraseña.
+              </p>
+            </div>
+
+            <div className="login-players-stack">
+              <div className="login-player-card-compact">
+                <div className="login-player-top">
+                  <h3 className="login-player-title">Jugador 1</h3>
+                  {jugador1.jugador && (
+                    <span className="login-status-badge">Activo</span>
+                  )}
+                </div>
+
+                {!jugador1.jugador ? (
+                  <>
+                    <p></p>
+                    <label className="form-label">Email</label>
+                    <input
+                      type="email"
+                      value={jugador1.email}
+                      onChange={(e) =>
+                        setJugador1((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                      className="form-input"
+                    />
+
+                    <label className="form-label">Contraseña</label>
+                    <input
+                      type="password"
+                      value={jugador1.password}
+                      onChange={(e) =>
+                        setJugador1((prev) => ({
+                          ...prev,
+                          password: e.target.value,
+                        }))
+                      }
+                      className="form-input"
+                    />
+
+                    {jugador1.error && (
+                      <p className="alert-error">{jugador1.error}</p>
+                    )}
+
+                    <p></p>
+
+                    <button
+                      className="btn btn-primary full-width"
+                      onClick={() => iniciarSesion(1)}
+                      disabled={jugador1.cargando}
+                    >
+                      {jugador1.cargando ? "Ingresando..." : "Iniciar sesión"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="auth-ok">✔ Autenticado</p>
+                    <p>Bienvenido, {jugador1.jugador.nombre_usuario}</p>
+                    <p className="alert-info">Sesión iniciada correctamente.</p>
+
+                    <button
+                      className="btn btn-danger full-width"
+                      onClick={() => cerrarSesionLocal(1)}
+                    >
+                      Cerrar sesión
+                    </button>
+                  </>
+                )}
               </div>
 
-              <div className="login-players-stack">
-                <div className="login-player-card-compact">
-                  <div>
-                    <div className="login-player-top">
-                      <h3 className="login-player-title">Jugador 1</h3>
-                      {jugador1 && <span className="login-status-badge">Activo</span>}
-                    </div>
-
-                    {jugador1 ? (
-                      <>
-                        <p className="auth-ok">✔ Autenticado</p>
-                        <p>Bienvenido, {jugador1.nombre_usuario}</p>
-
-                        <div className="login-fixed-message">
-                          {mensajeBienvenida?.tipo === "individual" ? (
-                            <p className="alert-info">{mensajeBienvenida.jugador1}</p>
-                          ) : (
-                            <p className="summary-text">
-                              Sesión iniciada correctamente.
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <label className="form-label">Usuario</label>
-                        <input
-                          className="form-input"
-                          value={usuario1}
-                          onChange={(e) => setUsuario1(e.target.value)}
-                        />
-
-                        <label className="form-label">Contraseña</label>
-                        <input
-                          className="form-input"
-                          type="password"
-                          value={password1}
-                          onChange={(e) => setPassword1(e.target.value)}
-                        />
-
-                        <div className="login-fixed-message">
-                          {error1 ? (
-                            <p className="alert-error">{error1}</p>
-                          ) : (
-                            <p className="summary-text">
-                              Ingresá usuario y contraseña.
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="login-actions">
-                    {jugador1 ? (
-                      <button
-                        className="btn btn-danger full-width"
-                        onClick={() => cerrarSesionJugador(1)}
-                      >
-                        Cerrar sesión
-                      </button>
-                    ) : (
-                      <button
-                        className="btn btn-primary full-width"
-                        onClick={() => iniciarSesion(usuario1, password1, 1)}
-                      >
-                        Iniciar sesión
-                      </button>
-                    )}
-                  </div>
+              <div className="login-player-card-compact">
+                <div className="login-player-top">
+                  <h3 className="login-player-title">Jugador 2</h3>
+                  {jugador2.jugador && (
+                    <span className="login-status-badge">Activo</span>
+                  )}
                 </div>
 
-                <div className="login-player-card-compact">
-                  <div>
-                    <div className="login-player-top">
-                      <h3 className="login-player-title">Jugador 2</h3>
-                      {jugador2 && <span className="login-status-badge">Activo</span>}
-                    </div>
+                {!jugador2.jugador ? (
+                  <>
+                    <p></p>
+                    <label className="form-label">Email</label>
+                    <input
+                      type="email"
+                      value={jugador2.email}
+                      onChange={(e) =>
+                        setJugador2((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                      className="form-input"
+                    />
 
-                    {jugador2 ? (
-                      <>
-                        <p className="auth-ok">✔ Autenticado</p>
-                        <p>Bienvenido, {jugador2.nombre_usuario}</p>
+                    <label className="form-label">Contraseña</label>
+                    <input
+                      type="password"
+                      value={jugador2.password}
+                      onChange={(e) =>
+                        setJugador2((prev) => ({
+                          ...prev,
+                          password: e.target.value,
+                        }))
+                      }
+                      className="form-input"
+                    />
 
-                        <div className="login-fixed-message">
-                          {mensajeBienvenida?.tipo === "individual" ? (
-                            <p className="alert-info">{mensajeBienvenida.jugador2}</p>
-                          ) : (
-                            <p className="summary-text">
-                              Sesión iniciada correctamente.
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <label className="form-label">Usuario</label>
-                        <input
-                          className="form-input"
-                          value={usuario2}
-                          onChange={(e) => setUsuario2(e.target.value)}
-                        />
-
-                        <label className="form-label">Contraseña</label>
-                        <input
-                          className="form-input"
-                          type="password"
-                          value={password2}
-                          onChange={(e) => setPassword2(e.target.value)}
-                        />
-
-                        <div className="login-fixed-message">
-                          {error2 ? (
-                            <p className="alert-error">{error2}</p>
-                          ) : (
-                            <p className="summary-text">
-                              Ingresá usuario y contraseña.
-                            </p>
-                          )}
-                        </div>
-                      </>
+                    {jugador2.error && (
+                      <p className="alert-error">{jugador2.error}</p>
                     )}
-                  </div>
 
-                  <div className="login-actions">
-                    {jugador2 ? (
-                      <button
-                        className="btn btn-danger full-width"
-                        onClick={() => cerrarSesionJugador(2)}
-                      >
-                        Cerrar sesión
-                      </button>
-                    ) : (
-                      <button
-                        className="btn btn-primary full-width"
-                        onClick={() => iniciarSesion(usuario2, password2, 2)}
-                      >
-                        Iniciar sesión
-                      </button>
-                    )}
-                  </div>
-                </div>
+                    <p></p>
+
+                    <button
+                      className="btn btn-primary full-width"
+                      onClick={() => iniciarSesion(2)}
+                      disabled={jugador2.cargando}
+                    >
+                      {jugador2.cargando ? "Ingresando..." : "Iniciar sesión"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="auth-ok">✔ Autenticado</p>
+                    <p>Bienvenido, {jugador2.jugador.nombre_usuario}</p>
+                    <p className="alert-info">Sesión iniciada correctamente.</p>
+
+                    <button
+                      className="btn btn-danger full-width"
+                      onClick={() => cerrarSesionLocal(2)}
+                    >
+                      Cerrar sesión
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="login-bottom-actions">
               <button
                 className="btn btn-secondary"
-                onClick={() => router.push("/registro")}
+                onClick={() => setMostrarRegistro(true)}
               >
                 Registrarse
               </button>
@@ -559,13 +543,117 @@ export default function HomePage() {
               <button
                 className="btn btn-primary"
                 onClick={continuar}
-                disabled={!jugador1 || !jugador2}
+                disabled={!jugador1.jugador || !jugador2.jugador}
               >
                 Continuar al juego
               </button>
             </div>
           </section>
         </div>
+
+        {mostrarRegistro && (
+          <div
+            className="modal-overlay"
+            onClick={() => setMostrarRegistro(false)}
+          >
+            <div
+              className="modal-content registro-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="registro-header">
+                <h2 className="login-right-title">Registro de Usuario</h2>
+                <p className="login-right-text">
+                  Completá los datos para crear un nuevo usuario.
+                </p>
+              </div>
+
+              <label className="form-label">Email</label>
+              <input
+                type="email"
+                value={registroEmail}
+                onChange={(e) => setRegistroEmail(e.target.value)}
+                className="form-input"
+                spellCheck={false}
+              />
+
+              <label className="form-label">Contraseña</label>
+              <input
+                type="password"
+                value={registroPassword}
+                onChange={(e) => setRegistroPassword(e.target.value)}
+                className="form-input"
+                spellCheck={false}
+              />
+
+              <label className="form-label">Nombre de usuario</label>
+              <input
+                value={registroNombreUsuario}
+                onChange={(e) => setRegistroNombreUsuario(e.target.value)}
+                className="form-input"
+                spellCheck={false}
+              />
+
+              <label className="form-label">País</label>
+              <div className="registro-pais-wrap">
+                <input
+                  value={registroPais}
+                  onChange={(e) => {
+                    setRegistroPais(e.target.value);
+                    setMostrarDropdownPaises(true);
+                  }}
+                  onFocus={() => setMostrarDropdownPaises(true)}
+                  className="form-input"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+
+                {mostrarDropdownPaises && paisesFiltrados.length > 0 && (
+                  <div className="dropdown">
+                    {paisesFiltrados.map((pais) => (
+                      <div
+                        key={pais.id}
+                        className="dropdown-item"
+                        onClick={() => {
+                          setRegistroPais(pais.nombre);
+                          setMostrarDropdownPaises(false);
+                        }}
+                      >
+                        {pais.nombre}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <label className="checkbox-row registro-checkbox">
+                <input
+                  type="checkbox"
+                  checked={registroMayor12}
+                  onChange={(e) => setRegistroMayor12(e.target.checked)}
+                />
+                <span>Soy mayor de 12 años</span>
+              </label>
+
+              {registroError && <p className="alert-error">{registroError}</p>}
+              {registroMensaje && (
+                <p className="alert-success">{registroMensaje}</p>
+              )}
+
+              <div className="login-bottom-actions registro-actions">
+                <button onClick={handleRegistrar} className="btn btn-primary">
+                  Crear cuenta
+                </button>
+
+                <button
+                  onClick={() => setMostrarRegistro(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
